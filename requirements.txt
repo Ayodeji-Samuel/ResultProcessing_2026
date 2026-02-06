@@ -1,0 +1,37 @@
+# Result Processing System - Requirements
+# Install with: pip install -r requirements.txt
+
+# Flask framework
+Flask>=2.3.0
+
+# Database ORM
+Flask-SQLAlchemy>=3.0.0
+
+# User authentication
+Flask-Login>=0.6.0
+
+# Forms and CSRF protection
+Flask-WTF>=1.1.0
+WTForms>=3.0.0
+email-validator>=2.0.0
+
+# Password hashing
+Werkzeug>=2.3.0
+
+# PDF generation
+reportlab>=4.0.0
+
+# CSV handling (built-in, but explicit)
+# csv is part of Python standard library
+
+# User agent parsing for device/browser detection
+user-agents>=2.2.0
+
+# HTTP requests for IP geolocation
+requests>=2.31.0
+
+# Environment variables (optional)
+python-dotenv>=1.0.0
+
+# Date/time handling (built-in, but explicit)
+# datetime is part of Python standard library

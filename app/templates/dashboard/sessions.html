@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Academic Sessions - Result Processing System{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="mb-8">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Academic Sessions</h1>
+            <p class="text-gray-600">Manage academic sessions and set current session</p>
+        </div>
+        <button onclick="document.getElementById('newSessionModal').classList.remove('hidden')" 
+                class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center">
+            <i class="ri-add-line mr-2"></i>
+            Add Session
+        </button>
+    </div>
+</div>
+
+<!-- Sessions Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for session in sessions %}
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow {% if session.is_current %}ring-4 ring-primary-500{% endif %}">
+        {% if session.is_current %}
+        <div class="bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-3 text-white">
+            <div class="flex items-center justify-between">
+                <span class="text-sm font-bold flex items-center">
+                    <i class="ri-bookmark-line mr-2"></i>CURRENT SESSION
+                </span>
+                <i class="ri-star-fill text-yellow-300"></i>
+            </div>
+        </div>
+        {% else %}
+        <div class="bg-gray-100 px-6 py-3">
+            <span class="text-sm font-medium text-gray-600">Academic Session</span>
+        </div>
+        {% endif %}
+        
+        <div class="p-6">
+            <h3 class="text-2xl font-bold text-gray-900 mb-4">{{ session.session_name }}</h3>
+            
+            <div class="space-y-3 mb-6">
+                <div class="flex items-center text-sm text-gray-600">
+                    <i class="ri-calendar-line mr-2 text-primary-600"></i>
+                    <span>Created: {{ session.created_at.strftime('%Y-%m-%d') }}</span>
+                </div>
+                {% if session.description %}
+                <div class="flex items-start text-sm text-gray-600">
+                    <i class="ri-file-text-line mr-2 text-primary-600 mt-0.5"></i>
+                    <span>{{ session.description }}</span>
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="flex space-x-2">
+                {% if not session.is_current %}
+                <form method="POST" action="{{ url_for('dashboard.set_current_session', session_id=session.id) }}" class="flex-1">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
+                        <i class="ri-check-line mr-1"></i>Set as Current
+                    </button>
+                </form>
+                <form method="POST" action="{{ url_for('dashboard.delete_session', session_id=session.id) }}" 
+                      onsubmit="return confirm('Are you sure you want to delete this session?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
+                        <i class="ri-delete-bin-line"></i>
+                    </button>
+                </form>
+                {% else %}
+                <div class="flex-1 px-4 py-2 bg-primary-100 text-primary-700 rounded-lg text-center text-sm font-medium">
+                    <i class="ri-star-line mr-1"></i>Active Session
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-span-full">
+        <div class="bg-white rounded-xl shadow-sm p-12 text-center">
+            <i class="ri-calendar-line text-6xl text-gray-300 mb-4"></i>
+            <p class="text-gray-500 font-medium mb-2">No academic sessions yet</p>
+            <p class="text-gray-400 text-sm">Create your first academic session to get started</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- New Session Modal -->
+<div id="newSessionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="if(event.target === this) this.classList.add('hidden')">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4" onclick="event.stopPropagation()">
+        <div class="bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-4 text-white rounded-t-xl">
+            <h3 class="text-xl font-bold">Create New Session</h3>
+        </div>
+        <form method="POST" action="{{ url_for('dashboard.create_session') }}" class="p-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Session Name</label>
+                <input type="text" name="session_name" required 
+                       placeholder="e.g., 2024/2025" 
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                <p class="text-xs text-gray-500 mt-1">Format: YYYY/YYYY</p>
+            </div>
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Description (Optional)</label>
+                <textarea name="description" rows="3" 
+                          placeholder="Additional information about this session..." 
+                          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"></textarea>
+            </div>
+            <div class="flex space-x-3">
+                <button type="button" onclick="document.getElementById('newSessionModal').classList.add('hidden')" 
+                        class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                    Cancel
+                </button>
+                <button type="submit" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium">
+                    Create Session
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

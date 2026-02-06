@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block title %}Security Monitor - Result Processing System{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="mb-8">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+            <i class="ri-shield-check-line mr-3 text-primary-600"></i>
+            Security Monitor
+        </h1>
+        <p class="text-gray-600">Real-time security monitoring and threat detection dashboard</p>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-blue-100 text-sm font-medium mb-1">Total Users</p>
+                <h3 class="text-3xl font-bold">{{ total_users }}</h3>
+                <p class="text-blue-100 text-xs mt-2">{{ active_users }} active</p>
+            </div>
+            <div class="bg-white bg-opacity-20 rounded-full p-4">
+                <i class="ri-user-line text-3xl"></i>
+            </div>
+        </div>
+    </div>
+    <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-lg">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-red-100 text-sm font-medium mb-1">Locked Accounts</p>
+                <h3 class="text-3xl font-bold">{{ locked_users }}</h3>
+                <p class="text-red-100 text-xs mt-2">Security threats blocked</p>
+            </div>
+            <div class="bg-white bg-opacity-20 rounded-full p-4">
+                <i class="ri-lock-line text-3xl"></i>
+            </div>
+        </div>
+    </div>
+    <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-green-100 text-sm font-medium mb-1">Security Events</p>
+                <h3 class="text-3xl font-bold">{{ security_events|length }}</h3>
+                <p class="text-green-100 text-xs mt-2">Recent 50 events</p>
+            </div>
+            <div class="bg-white bg-opacity-20 rounded-full p-4">
+                <i class="ri-alert-line text-3xl"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Locked Accounts Alert -->
+{% if locked_accounts %}
+<div class="bg-red-50 border-l-4 border-red-500 p-6 rounded-lg mb-8">
+    <div class="flex items-start">
+        <i class="ri-error-warning-line text-red-500 text-2xl mr-3"></i>
+        <div class="flex-1">
+            <h3 class="text-red-800 font-bold mb-2">{{ locked_accounts|length }} Account(s) Currently Locked</h3>
+            <div class="space-y-2">
+                {% for user in locked_accounts %}
+                <div class="bg-white rounded-lg p-3 flex items-center justify-between">
+                    <div class="flex items-center">
+                        <div class="bg-red-100 rounded-full p-2 mr-3">
+                            <i class="ri-user-forbid-line text-red-600"></i>
+                        </div>
+                        <div>
+                            <p class="font-semibold text-gray-900">{{ user.username }}</p>
+                            <p class="text-sm text-gray-600">{{ user.full_name }} - {{ user.role|upper }}</p>
+                            {% if user.locked_until %}
+                            <p class="text-xs text-red-600">Locked until {{ user.locked_until.strftime('%Y-%m-%d %H:%M') }}</p>
+                            {% else %}
+                            <p class="text-xs text-red-600">Permanently locked</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <a href="{{ url_for('auth.unlock_user', user_id=user.id) }}" 
+                       class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
+                        <i class="ri-lock-unlock-line mr-1"></i>Unlock
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Recent Security Events -->
+<div class="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
+    <div class="bg-gradient-to-r from-red-600 to-red-700 px-6 py-4 text-white">
+        <h2 class="text-xl font-bold flex items-center">
+            <i class="ri-alarm-warning-line mr-2"></i>
+            Recent Security Events
+        </h2>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Timestamp</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Event</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">User</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">IP Address</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Details</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for event in security_events %}
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="text-sm text-gray-600">{{ event.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if event.action == 'FAILED_LOGIN' %}
+                        <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                            <i class="ri-close-circle-line mr-1"></i>Failed Login
+                        </span>
+                        {% elif event.action == 'ACCOUNT_LOCKED' %}
+                        <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
+                            <i class="ri-lock-line mr-1"></i>Account Locked
+                        </span>
+                        {% elif event.action == 'LOCKED_LOGIN_ATTEMPT' %}
+                        <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
+                            <i class="ri-error-warning-line mr-1"></i>Locked Login Attempt
+                        </span>
+                        {% elif event.action == 'UNLOCK_ACCOUNT' %}
+                        <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                            <i class="ri-lock-unlock-line mr-1"></i>Account Unlocked
+                        </span>
+                        {% elif event.action == 'RESET_PASSWORD' %}
+                        <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                            <i class="ri-key-line mr-1"></i>Password Reset
+                        </span>
+                        {% else %}
+                        <span class="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">
+                            {{ event.action }}
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        <p class="text-sm font-medium text-gray-900">{{ event.username }}</p>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="font-mono text-xs text-gray-600">{{ event.ip_address }}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <p class="text-sm text-gray-600">{{ event.details if event.details else '-' }}</p>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="px-6 py-12 text-center">
+                        <div class="flex flex-col items-center">
+                            <i class="ri-shield-check-line text-6xl text-gray-300 mb-4"></i>
+                            <p class="text-gray-500 font-medium">No security events</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Recent Login Activity -->
+<div class="bg-white rounded-xl shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 text-white">
+        <h2 class="text-xl font-bold flex items-center">
+            <i class="ri-login-circle-line mr-2"></i>
+            Recent Login Activity (Last 100)
+        </h2>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Timestamp</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Action</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">User</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">IP Address</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Device</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for activity in login_activity %}
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="text-sm text-gray-600">{{ activity.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if activity.action == 'LOGIN' %}
+                        <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                            <i class="ri-login-circle-line mr-1"></i>Login
+                        </span>
+                        {% elif activity.action == 'LOGOUT' %}
+                        <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                            <i class="ri-logout-circle-line mr-1"></i>Logout
+                        </span>
+                        {% elif activity.action == 'FAILED_LOGIN' %}
+                        <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
+                            <i class="ri-close-circle-line mr-1"></i>Failed
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        <p class="text-sm font-medium text-gray-900">{{ activity.username }}</p>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="font-mono text-xs text-gray-600">{{ activity.ip_address }}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="space-y-1">
+                            {% if activity.device_type or activity.browser or activity.operating_system %}
+                            <div class="flex items-center text-xs text-gray-600">
+                                <i class="ri-device-line mr-1"></i>
+                                <span>{{ activity.device_type|title if activity.device_type else 'Unknown' }}</span>
+                            </div>
+                            <div class="flex items-center text-xs text-gray-600">
+                                <i class="ri-window-line mr-1"></i>
+                                <span>{{ activity.browser if activity.browser else 'Unknown' }} on {{ activity.operating_system if activity.operating_system else 'Unknown' }}</span>
+                            </div>
+                            {% if activity.user_agent %}
+                            <div class="text-xs text-gray-500 truncate max-w-xs" title="{{ activity.user_agent }}">
+                                {{ activity.user_agent[:60] }}...
+                            </div>
+                            {% endif %}
+                            {% else %}
+                            <span class="text-xs text-gray-500">-</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

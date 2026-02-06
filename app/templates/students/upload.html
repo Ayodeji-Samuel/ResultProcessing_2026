@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Students - Result Processing System{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="mb-8">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Upload Student Records</h1>
+            <p class="text-gray-600">Import students from CSV file for {{ current_session.session_name }}</p>
+        </div>
+        <a href="{{ url_for('students.index') }}" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center">
+            <i class="ri-arrow-left-line mr-2"></i>
+            Back to Students
+        </a>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main Upload Form -->
+    <div class="lg:col-span-2">
+        <div class="bg-white rounded-xl shadow-sm">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-green-50 to-blue-50">
+                <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+                    <i class="ri-upload-cloud-line mr-2 text-green-600"></i>
+                    Upload CSV File
+                </h2>
+            </div>
+            <div class="p-6">
+                <form method="POST" action="{{ url_for('students.upload') }}" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <!-- Level and Program Selection -->
+                    <div class="mb-6">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center">
+                            <span class="w-6 h-6 bg-green-600 text-white rounded-full flex items-center justify-center text-xs mr-2">1</span>
+                            Select Level & Program
+                        </h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="level" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Level <span class="text-red-500">*</span>
+                                </label>
+                                <select name="level" id="level" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" required {{ 'disabled' if level_access }}>
+                                    <option value="">Select Level</option>
+                                    {% for level in levels %}
+                                    <option value="{{ level }}" {{ 'selected' if level_access == level }}>{{ level }} Level</option>
+                                    {% endfor %}
+                                </select>
+                                {% if level_access %}
+                                <input type="hidden" name="level" value="{{ level_access }}">
+                                <p class="mt-1 text-sm text-gray-500">
+                                    <i class="ri-lock-line"></i> Locked to your assigned level
+                                </p>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <label for="program" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Program <span class="text-red-500">*</span>
+                                </label>
+                                <select name="program" id="program" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" required {{ 'disabled' if program_access }}>
+                                    <option value="">Select Program</option>
+                                    {% for code, name in programs %}
+                                    <option value="{{ code }}" {{ 'selected' if program_access == code }}>{{ name }}</option>
+                                    {% endfor %}
+                                </select>
+                                {% if program_access %}
+                                <input type="hidden" name="program" value="{{ program_access }}">
+                                <p class="mt-1 text-sm text-gray-500">
+                                    <i class="ri-lock-line"></i> Locked to your assigned program
+                                </p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- File Upload -->
+                    <div class="mb-6">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center">
+                            <span class="w-6 h-6 bg-green-600 text-white rounded-full flex items-center justify-center text-xs mr-2">2</span>
+                            Choose CSV File
+                        </h3>
+                        
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-green-500 transition-colors">
+                            <div class="mb-4">
+                                <i class="ri-file-upload-line text-5xl text-gray-400"></i>
+                            </div>
+                            <label for="file" class="cursor-pointer">
+                                <span class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium inline-flex items-center">
+                                    <i class="ri-folder-open-line mr-2"></i>
+                                    Choose File
+                                </span>
+                                <input type="file" class="hidden" id="file" name="file" accept=".csv" required onchange="updateFileName(this)">
+                            </label>
+                            <p class="mt-3 text-sm text-gray-500" id="file-name">No file chosen</p>
+                            <p class="mt-1 text-xs text-gray-400">CSV files only, max 16MB</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="flex space-x-3 pt-4 border-t border-gray-200">
+                        <button type="submit" class="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all font-medium flex items-center justify-center shadow-lg">
+                            <i class="ri-upload-cloud-line mr-2"></i>
+                            Upload Students
+                        </button>
+                        <a href="{{ url_for('students.index') }}" class="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium">
+                            Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sidebar -->
+    <div class="lg:col-span-1 space-y-6">
+        <!-- CSV Format Card -->
+        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
+            <h3 class="text-lg font-semibold mb-4 flex items-center">
+                <i class="ri-file-list-line mr-2"></i>
+                CSV Format
+            </h3>
+            <p class="text-sm text-blue-100 mb-3">Your CSV file should have these columns:</p>
+            <ul class="space-y-2 text-sm">
+                <li class="flex items-start">
+                    <i class="ri-checkbox-circle-fill mr-2 mt-0.5 text-blue-200"></i>
+                    <span><strong>Matric Number</strong> (required)</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-checkbox-circle-fill mr-2 mt-0.5 text-blue-200"></i>
+                    <span><strong>Surname</strong> (required)</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-checkbox-circle-fill mr-2 mt-0.5 text-blue-200"></i>
+                    <span><strong>First Name</strong> (required)</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-checkbox-circle-line mr-2 mt-0.5 text-blue-200"></i>
+                    <span><strong>Other Names</strong> (optional)</span>
+                </li>
+            </ul>
+            
+            <div class="mt-4 pt-4 border-t border-blue-400">
+                <a href="{{ url_for('students.sample_csv') }}" class="block w-full px-4 py-2 bg-white text-blue-600 text-center rounded-lg hover:bg-blue-50 transition-colors font-medium">
+                    <i class="ri-download-line mr-2"></i>
+                    Download Sample CSV
+                </a>
+            </div>
+        </div>
+        
+        <!-- Tips Card -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <i class="ri-lightbulb-line mr-2 text-yellow-500"></i>
+                Important Notes
+            </h3>
+            <ul class="space-y-2 text-sm text-gray-600">
+                <li class="flex items-start">
+                    <i class="ri-information-line text-primary-600 mr-2 mt-0.5"></i>
+                    <span>Column names are case-insensitive</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-information-line text-primary-600 mr-2 mt-0.5"></i>
+                    <span>Existing students will be updated</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-information-line text-primary-600 mr-2 mt-0.5"></i>
+                    <span>All assigned to selected level & program</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-alert-line text-yellow-500 mr-2 mt-0.5"></i>
+                    <span>Maximum file size: 16MB</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+function updateFileName(input) {
+    const fileName = input.files[0] ? input.files[0].name : 'No file chosen';
+    document.getElementById('file-name').textContent = fileName;
+    if (input.files[0]) {
+        document.getElementById('file-name').classList.add('text-green-600', 'font-medium');
+    }
+}
+</script>
+{% endblock %}

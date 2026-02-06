@@ -1,0 +1,604 @@
+{% extends "base.html" %}
+
+{% block title %}Result Alteration Log - Admin - Result Processing System{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="mb-8">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+                <i class="ri-file-edit-line mr-3 text-red-600"></i>
+                Result Alteration Log
+            </h1>
+            <p class="text-gray-600">Comprehensive tracking of all student result modifications (Admin Only)</p>
+        </div>
+        <a href="{{ url_for('dashboard.index') }}" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center">
+            <i class="ri-arrow-left-line mr-2"></i>
+            Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-blue-100 text-sm font-medium mb-1">Total Alterations</p>
+                <h3 class="text-3xl font-bold">{{ alterations.total }}</h3>
+            </div>
+            <div class="bg-white bg-opacity-20 rounded-full p-4">
+                <i class="ri-file-list-line text-3xl"></i>
+            </div>
+        </div>
+    </div>
+    <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-green-100 text-sm font-medium mb-1">Created</p>
+                <h3 class="text-3xl font-bold">{{ alterations.items|selectattr('alteration_type', 'equalto', 'CREATE')|list|length }}</h3>
+            </div>
+            <div class="bg-white bg-opacity-20 rounded-full p-4">
+                <i class="ri-add-circle-line text-3xl"></i>
+            </div>
+        </div>
+    </div>
+    <div class="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl p-6 text-white shadow-lg">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-yellow-100 text-sm font-medium mb-1">Updated</p>
+                <h3 class="text-3xl font-bold">{{ alterations.items|selectattr('alteration_type', 'equalto', 'UPDATE')|list|length }}</h3>
+            </div>
+            <div class="bg-white bg-opacity-20 rounded-full p-4">
+                <i class="ri-edit-line text-3xl"></i>
+            </div>
+        </div>
+    </div>
+    <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-lg">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-red-100 text-sm font-medium mb-1">Deleted</p>
+                <h3 class="text-3xl font-bold">{{ alterations.items|selectattr('alteration_type', 'equalto', 'DELETE')|list|length }}</h3>
+            </div>
+            <div class="bg-white bg-opacity-20 rounded-full p-4">
+                <i class="ri-delete-bin-line text-3xl"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="bg-white rounded-xl shadow-sm mb-8 p-6">
+    <form method="GET" action="{{ url_for('auth.result_alterations') }}" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Student (Matric/Name)</label>
+            <input type="text" name="student" value="{{ current_filters.student }}" 
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                   placeholder="Search by matric or name">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Course (Code/Title)</label>
+            <select name="course" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <option value="">All Courses</option>
+                {% for course in courses %}
+                <option value="{{ course.code }}" {% if current_filters.course == course.code %}selected{% endif %}>
+                    {{ course.code }} - {{ course.title }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Modified By</label>
+            <select name="user" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <option value="">All Users</option>
+                {% for user in users %}
+                <option value="{{ user.name }}" {% if current_filters.user == user.name %}selected{% endif %}>
+                    {{ user.name }} ({{ user.role }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Alteration Type</label>
+            <select name="type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <option value="">All Types</option>
+                {% for type in alteration_types %}
+                <option value="{{ type }}" {% if current_filters.type == type %}selected{% endif %}>{{ type }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Date From</label>
+            <input type="date" name="date_from" value="{{ current_filters.date_from }}" 
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Date To</label>
+            <input type="date" name="date_to" value="{{ current_filters.date_to }}" 
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        </div>
+        <div class="md:col-span-3 flex gap-2">
+            <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center">
+                <i class="ri-search-line mr-2"></i>
+                Filter
+            </button>
+            <a href="{{ url_for('auth.result_alterations') }}" 
+               class="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center">
+                <i class="ri-close-line mr-2"></i>
+                Clear Filters
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- Alteration Log Table -->
+<div class="bg-white rounded-xl shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-red-600 to-red-700 px-6 py-4 text-white">
+        <h2 class="text-xl font-bold flex items-center">
+            <i class="ri-file-list-3-line mr-2"></i>
+            Alteration Records ({{ alterations.total }} total)
+        </h2>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date/Time</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Type</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Student</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Course</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Changes</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Modified By</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        <i class="ri-global-line mr-1"></i>Location & Device
+                    </th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for alt in alterations.items %}
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="text-sm text-gray-600">{{ alt.created_at.strftime('%Y-%m-%d') }}</span>
+                        <br>
+                        <span class="text-xs text-gray-500">{{ alt.created_at.strftime('%H:%M:%S') }}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if alt.alteration_type == 'CREATE' %}
+                        <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                            <i class="ri-add-circle-line mr-1"></i>CREATE
+                        </span>
+                        {% elif alt.alteration_type == 'UPDATE' %}
+                        <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                            <i class="ri-edit-line mr-1"></i>UPDATE
+                        </span>
+                        {% elif alt.alteration_type == 'DELETE' %}
+                        <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
+                            <i class="ri-delete-bin-line mr-1"></i>DELETE
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        <p class="text-sm font-medium text-gray-900">{{ alt.student_name }}</p>
+                        <p class="text-xs text-gray-500">{{ alt.student_matric }}</p>
+                    </td>
+                    <td class="px-6 py-4">
+                        <p class="text-sm font-medium text-gray-900">{{ alt.course_code }}</p>
+                        <p class="text-xs text-gray-500">{{ alt.course_title[:30] }}</p>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="text-xs space-y-1">
+                            {% if alt.alteration_type == 'UPDATE' %}
+                                {% if alt.old_ca_score != alt.new_ca_score %}
+                                <div class="flex items-center">
+                                    <span class="text-gray-600">CA:</span>
+                                    <span class="text-red-600 line-through ml-1">{{ alt.old_ca_score }}</span>
+                                    <i class="ri-arrow-right-line mx-1 text-gray-400"></i>
+                                    <span class="text-green-600 font-medium">{{ alt.new_ca_score }}</span>
+                                </div>
+                                {% endif %}
+                                {% if alt.old_exam_score != alt.new_exam_score %}
+                                <div class="flex items-center">
+                                    <span class="text-gray-600">Exam:</span>
+                                    <span class="text-red-600 line-through ml-1">{{ alt.old_exam_score }}</span>
+                                    <i class="ri-arrow-right-line mx-1 text-gray-400"></i>
+                                    <span class="text-green-600 font-medium">{{ alt.new_exam_score }}</span>
+                                </div>
+                                {% endif %}
+                                {% if alt.old_total_score != alt.new_total_score %}
+                                <div class="flex items-center">
+                                    <span class="text-gray-600">Total:</span>
+                                    <span class="text-red-600 line-through ml-1">{{ alt.old_total_score }}</span>
+                                    <i class="ri-arrow-right-line mx-1 text-gray-400"></i>
+                                    <span class="text-green-600 font-medium">{{ alt.new_total_score }}</span>
+                                </div>
+                                {% endif %}
+                                {% if alt.old_grade != alt.new_grade %}
+                                <div class="flex items-center">
+                                    <span class="text-gray-600">Grade:</span>
+                                    <span class="text-red-600 line-through ml-1">{{ alt.old_grade }}</span>
+                                    <i class="ri-arrow-right-line mx-1 text-gray-400"></i>
+                                    <span class="text-green-600 font-medium">{{ alt.new_grade }}</span>
+                                </div>
+                                {% endif %}
+                            {% elif alt.alteration_type == 'CREATE' %}
+                                <div class="text-green-600">
+                                    CA: {{ alt.new_ca_score }}, Exam: {{ alt.new_exam_score }}<br>
+                                    Total: {{ alt.new_total_score }}, Grade: {{ alt.new_grade }}
+                                </div>
+                            {% elif alt.alteration_type == 'DELETE' %}
+                                <div class="text-red-600">
+                                    Deleted: CA {{ alt.old_ca_score }}, Exam {{ alt.old_exam_score }}<br>
+                                    Total: {{ alt.old_total_score }}, Grade: {{ alt.old_grade }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <p class="text-sm font-medium text-gray-900">{{ alt.altered_by_name }}</p>
+                        <p class="text-xs text-gray-500">{{ alt.altered_by_role|upper }}</p>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="space-y-1 text-xs">
+                            <div class="flex items-center text-gray-600">
+                                <i class="ri-global-line mr-1"></i>
+                                <span class="font-mono">{{ alt.ip_address or 'Unknown' }}</span>
+                            </div>
+                            <div class="flex items-center text-gray-600">
+                                <i class="ri-device-line mr-1"></i>
+                                <span>{{ alt.device_type or 'Unknown' }}</span>
+                            </div>
+                            <div class="flex items-center text-gray-600">
+                                <i class="ri-window-line mr-1"></i>
+                                <span>{{ alt.browser or 'Unknown' }}</span>
+                            </div>
+                            <div class="flex items-center text-gray-600">
+                                <i class="ri-map-pin-line mr-1"></i>
+                                <span>{{ alt.location or 'Unknown' }}</span>
+                            </div>
+                            {% if alt.latitude and alt.longitude %}
+                            <div class="flex items-center text-blue-600">
+                                <i class="ri-map-2-line mr-1"></i>
+                                <span class="font-mono text-xs">{{ "%.4f"|format(alt.latitude) }}, {{ "%.4f"|format(alt.longitude) }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <button onclick="showDetails({{ alt.id }})" 
+                                class="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors text-xs font-medium">
+                            <i class="ri-eye-line mr-1"></i>Details
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="px-6 py-12 text-center">
+                        <div class="flex flex-col items-center">
+                            <i class="ri-file-edit-line text-6xl text-gray-300 mb-4"></i>
+                            <p class="text-gray-500 font-medium">No result alterations found</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Pagination -->
+    {% if alterations.pages > 1 %}
+    <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+        <div class="text-sm text-gray-600">
+            Showing {{ ((alterations.page - 1) * 50) + 1 }} to {{ min(alterations.page * 50, alterations.total) }} of {{ alterations.total }} entries
+        </div>
+        <div class="flex gap-2">
+            {% if alterations.has_prev %}
+            <a href="{{ url_for('auth.result_alterations', page=alterations.prev_num, **current_filters) }}" 
+               class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                <i class="ri-arrow-left-line mr-1"></i>Previous
+            </a>
+            {% endif %}
+            
+            <span class="px-4 py-2 bg-blue-600 text-white rounded-lg">
+                Page {{ alterations.page }} of {{ alterations.pages }}
+            </span>
+            
+            {% if alterations.has_next %}
+            <a href="{{ url_for('auth.result_alterations', page=alterations.next_num, **current_filters) }}" 
+               class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                Next<i class="ri-arrow-right-line ml-1"></i>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Details Modal -->
+<div id="detailsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+        <!-- Modal Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
+            <h3 class="text-xl font-bold text-white flex items-center">
+                <i class="ri-file-info-line mr-2"></i>
+                Alteration Details
+            </h3>
+            <button onclick="closeModal()" class="text-white hover:text-gray-200 transition-colors">
+                <i class="ri-close-line text-2xl"></i>
+            </button>
+        </div>
+        
+        <!-- Modal Body -->
+        <div class="p-6 overflow-y-auto max-h-[calc(90vh-80px)]" id="modalContent">
+            <!-- Content will be populated by JavaScript -->
+        </div>
+    </div>
+</div>
+
+<!-- Hidden data store for alterations -->
+<script id="alterations-data" type="application/json">
+{
+    {% for alt in alterations.items %}
+    "{{ alt.id }}": {
+        "id": {{ alt.id }},
+        "student_matric": "{{ alt.student_matric }}",
+        "student_name": "{{ alt.student_name }}",
+        "course_code": "{{ alt.course_code }}",
+        "course_title": "{{ alt.course_title }}",
+        "session_name": "{{ alt.session_name }}",
+        "altered_by_name": "{{ alt.altered_by_name }}",
+        "altered_by_role": "{{ alt.altered_by_role }}",
+        "alteration_type": "{{ alt.alteration_type }}",
+        "old_ca_score": {{ alt.old_ca_score if alt.old_ca_score is not none else 'null' }},
+        "new_ca_score": {{ alt.new_ca_score if alt.new_ca_score is not none else 'null' }},
+        "old_exam_score": {{ alt.old_exam_score if alt.old_exam_score is not none else 'null' }},
+        "new_exam_score": {{ alt.new_exam_score if alt.new_exam_score is not none else 'null' }},
+        "old_total_score": {{ alt.old_total_score if alt.old_total_score is not none else 'null' }},
+        "new_total_score": {{ alt.new_total_score if alt.new_total_score is not none else 'null' }},
+        "old_grade": {{ alt.old_grade|tojson if alt.old_grade else 'null' }},
+        "new_grade": {{ alt.new_grade|tojson if alt.new_grade else 'null' }},
+        "ip_address": {{ (alt.ip_address or 'Unknown')|tojson }},
+        "user_agent": {{ (alt.user_agent or 'Unknown')|tojson }},
+        "device_type": {{ (alt.device_type or 'Unknown')|tojson }},
+        "browser": {{ (alt.browser or 'Unknown')|tojson }},
+        "operating_system": {{ (alt.operating_system or 'Unknown')|tojson }},
+        "device_username": {{ (alt.device_username or 'Unknown')|tojson }},
+        "location": {{ (alt.location or 'Unknown')|tojson }},
+        "latitude": {{ alt.latitude if alt.latitude is not none else 'null' }},
+        "longitude": {{ alt.longitude if alt.longitude is not none else 'null' }},
+        "reason": {{ alt.reason|tojson if alt.reason else 'null' }},
+        "created_at": "{{ alt.created_at.strftime('%B %d, %Y at %I:%M %p') }}"
+    }{{ ',' if not loop.last else '' }}
+    {% endfor %}
+}
+</script>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const alterationsData = JSON.parse(document.getElementById('alterations-data').textContent);
+
+function showDetails(alterationId) {
+    const alt = alterationsData[alterationId];
+    if (!alt) {
+        alert('Alteration data not found');
+        return;
+    }
+    
+    let typeColor = '';
+    let typeIcon = '';
+    if (alt.alteration_type === 'CREATE') {
+        typeColor = 'bg-green-100 text-green-800';
+        typeIcon = 'ri-add-circle-line';
+    } else if (alt.alteration_type === 'UPDATE') {
+        typeColor = 'bg-yellow-100 text-yellow-800';
+        typeIcon = 'ri-edit-line';
+    } else {
+        typeColor = 'bg-red-100 text-red-800';
+        typeIcon = 'ri-delete-bin-line';
+    }
+    
+    let scoreChangesHtml = '';
+    if (alt.alteration_type === 'UPDATE') {
+        scoreChangesHtml = `
+            <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                    <i class="ri-arrow-left-right-line mr-2"></i>
+                    Score Changes
+                </h4>
+                <div class="grid grid-cols-2 gap-4">
+                    ${generateScoreChange('CA Score', alt.old_ca_score, alt.new_ca_score)}
+                    ${generateScoreChange('Exam Score', alt.old_exam_score, alt.new_exam_score)}
+                    ${generateScoreChange('Total Score', alt.old_total_score, alt.new_total_score)}
+                    ${generateScoreChange('Grade', alt.old_grade, alt.new_grade)}
+                </div>
+            </div>
+        `;
+    } else if (alt.alteration_type === 'CREATE') {
+        scoreChangesHtml = `
+            <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                    <i class="ri-file-add-line mr-2"></i>
+                    New Result Created
+                </h4>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <span class="text-xs text-gray-500">CA Score:</span>
+                        <span class="font-semibold text-green-600 ml-2">${alt.new_ca_score ?? 'N/A'}</span>
+                    </div>
+                    <div>
+                        <span class="text-xs text-gray-500">Exam Score:</span>
+                        <span class="font-semibold text-green-600 ml-2">${alt.new_exam_score ?? 'N/A'}</span>
+                    </div>
+                    <div>
+                        <span class="text-xs text-gray-500">Total Score:</span>
+                        <span class="font-semibold text-green-600 ml-2">${alt.new_total_score ?? 'N/A'}</span>
+                    </div>
+                    <div>
+                        <span class="text-xs text-gray-500">Grade:</span>
+                        <span class="font-semibold text-green-600 ml-2">${alt.new_grade ?? 'N/A'}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    const content = `
+        <!-- Alteration Type Badge -->
+        <div class="mb-6">
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${typeColor}">
+                <i class="${typeIcon} mr-2"></i>
+                ${alt.alteration_type}
+            </span>
+            <span class="text-gray-500 text-sm ml-3">
+                <i class="ri-time-line mr-1"></i>
+                ${alt.created_at}
+            </span>
+        </div>
+        
+        <!-- Student & Course Info -->
+        <div class="grid grid-cols-2 gap-6 mb-6">
+            <div class="bg-blue-50 rounded-lg p-4">
+                <h4 class="text-sm font-semibold text-blue-900 mb-2 flex items-center">
+                    <i class="ri-user-line mr-2"></i>
+                    Student Information
+                </h4>
+                <p class="text-sm"><span class="text-gray-600">Matric:</span> <span class="font-mono font-semibold">${alt.student_matric}</span></p>
+                <p class="text-sm"><span class="text-gray-600">Name:</span> <span class="font-semibold">${alt.student_name}</span></p>
+            </div>
+            <div class="bg-purple-50 rounded-lg p-4">
+                <h4 class="text-sm font-semibold text-purple-900 mb-2 flex items-center">
+                    <i class="ri-book-line mr-2"></i>
+                    Course Information
+                </h4>
+                <p class="text-sm"><span class="text-gray-600">Code:</span> <span class="font-mono font-semibold">${alt.course_code}</span></p>
+                <p class="text-sm"><span class="text-gray-600">Title:</span> <span class="font-semibold">${alt.course_title}</span></p>
+                <p class="text-sm"><span class="text-gray-600">Session:</span> <span class="font-semibold">${alt.session_name}</span></p>
+            </div>
+        </div>
+        
+        <!-- Score Changes -->
+        ${scoreChangesHtml}
+        
+        <!-- User Information -->
+        <div class="bg-gray-50 rounded-lg p-4 mb-6">
+            <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                <i class="ri-user-settings-line mr-2"></i>
+                Performed By
+            </h4>
+            <p class="text-sm"><span class="text-gray-600">Name:</span> <span class="font-semibold">${alt.altered_by_name}</span></p>
+            <p class="text-sm"><span class="text-gray-600">Role:</span> <span class="font-semibold capitalize">${alt.altered_by_role}</span></p>
+        </div>
+        
+        <!-- Device & Location Info -->
+        <div class="bg-gray-50 rounded-lg p-4 mb-6">
+            <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                <i class="ri-computer-line mr-2"></i>
+                Device & Location Information
+            </h4>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <span class="text-xs text-gray-500">IP Address:</span>
+                    <p class="font-mono text-sm font-semibold">${alt.ip_address}</p>
+                </div>
+                <div>
+                    <span class="text-xs text-gray-500">Device Type:</span>
+                    <p class="text-sm font-semibold capitalize">${alt.device_type}</p>
+                </div>
+                <div>
+                    <span class="text-xs text-gray-500">Browser:</span>
+                    <p class="text-sm font-semibold">${alt.browser}</p>
+                </div>
+                <div>
+                    <span class="text-xs text-gray-500">Operating System:</span>
+                    <p class="text-sm font-semibold">${alt.operating_system}</p>
+                </div>
+                <div>
+                    <span class="text-xs text-gray-500">Device Username:</span>
+                    <p class="text-sm font-semibold">${alt.device_username}</p>
+                </div>
+                <div>
+                    <span class="text-xs text-gray-500">Location:</span>
+                    <p class="text-sm font-semibold">${alt.location}</p>
+                </div>
+                ${alt.latitude && alt.longitude ? `
+                <div>
+                    <span class="text-xs text-gray-500">Coordinates:</span>
+                    <p class="text-sm font-semibold font-mono">${alt.latitude.toFixed(6)}, ${alt.longitude.toFixed(6)}</p>
+                    <a href="https://www.google.com/maps?q=${alt.latitude},${alt.longitude}" 
+                       target="_blank" 
+                       class="text-xs text-blue-600 hover:text-blue-800 flex items-center mt-1">
+                        <i class="ri-map-pin-line mr-1"></i>View on Google Maps
+                    </a>
+                </div>
+                ` : ''}
+            </div>
+            <div class="mt-3">
+                <span class="text-xs text-gray-500">User Agent:</span>
+                <p class="text-xs font-mono bg-white p-2 rounded border border-gray-200 break-all">${alt.user_agent}</p>
+            </div>
+        </div>
+        
+        <!-- Reason -->
+        ${alt.reason ? `
+        <div class="bg-amber-50 rounded-lg p-4 border border-amber-200">
+            <h4 class="text-sm font-semibold text-amber-900 mb-2 flex items-center">
+                <i class="ri-question-line mr-2"></i>
+                Reason for Change
+            </h4>
+            <p class="text-sm text-gray-700 whitespace-pre-wrap">${alt.reason}</p>
+        </div>
+        ` : ''}
+    `;
+    
+    document.getElementById('modalContent').innerHTML = content;
+    document.getElementById('detailsModal').classList.remove('hidden');
+}
+
+function generateScoreChange(label, oldVal, newVal) {
+    if (oldVal === newVal || (oldVal === null && newVal === null)) {
+        return `
+            <div>
+                <span class="text-xs text-gray-500">${label}:</span>
+                <span class="text-sm font-semibold text-gray-600 ml-2">${oldVal ?? 'N/A'} (No change)</span>
+            </div>
+        `;
+    }
+    
+    const isIncrease = (newVal ?? 0) > (oldVal ?? 0);
+    const arrow = isIncrease ? '↑' : '↓';
+    const color = isIncrease ? 'text-green-600' : 'text-red-600';
+    
+    return `
+        <div>
+            <span class="text-xs text-gray-500">${label}:</span>
+            <div class="text-sm mt-1">
+                <span class="text-gray-600 line-through">${oldVal ?? 'N/A'}</span>
+                <i class="ri-arrow-right-line mx-2 ${color}"></i>
+                <span class="font-semibold ${color}">${newVal ?? 'N/A'} ${arrow}</span>
+            </div>
+        </div>
+    `;
+}
+
+function closeModal() {
+    document.getElementById('detailsModal').classList.add('hidden');
+}
+
+// Close modal when clicking outside
+document.getElementById('detailsModal')?.addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeModal();
+    }
+});
+
+// Close modal with ESC key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeModal();
+    }
+});
+</script>
+{% endblock %}

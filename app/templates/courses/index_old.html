@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Courses - Result Processing System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Courses</h1>
+        <p class="text-muted">Manage course information</p>
+    </div>
+    <div class="btn-group">
+        <a href="{{ url_for('courses.create') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Add Course
+        </a>
+        <a href="{{ url_for('courses.batch_create') }}" class="btn btn-outline-primary">
+            <i class="bi bi-list-check"></i> Batch Add
+        </a>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('courses.index') }}" class="row g-3">
+            {% if not level_access %}
+            <div class="col-md-2">
+                <select name="level" class="form-select">
+                    <option value="">All Levels</option>
+                    {% for level in levels %}
+                    <option value="{{ level }}" {{ 'selected' if level_filter == level }}>{{ level }} Level</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            {% if not program_access %}
+            <div class="col-md-3">
+                <select name="program" class="form-select">
+                    <option value="">All Programs</option>
+                    {% for code, name in programs %}
+                    <option value="{{ code }}" {{ 'selected' if program_filter == code }}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <div class="col-md-2">
+                <select name="semester" class="form-select">
+                    <option value="">All Semesters</option>
+                    {% for sem_id, sem_name in semesters %}
+                    <option value="{{ sem_id }}" {{ 'selected' if semester_filter == sem_id }}>{{ sem_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-secondary w-100">
+                    <i class="bi bi-search"></i> Filter
+                </button>
+            </div>
+            <div class="col-md-2">
+                <a href="{{ url_for('courses.index') }}" class="btn btn-outline-secondary w-100">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Courses Table -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Course Code</th>
+                        <th>Course Title</th>
+                        <th>Units</th>
+                        <th>Semester</th>
+                        <th>Level</th>
+                        <th>Status</th>
+                        <th>Program</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for course in courses.items %}
+                    <tr>
+                        <td><strong>{{ course.course_code }}</strong></td>
+                        <td>{{ course.course_title }}</td>
+                        <td><span class="badge bg-secondary">{{ course.credit_unit }}</span></td>
+                        <td>{{ 'First' if course.semester == 1 else 'Second' }}</td>
+                        <td>{{ course.level }}</td>
+                        <td>
+                            <span class="badge {{ 'bg-danger' if course.status == 'C' else 'bg-info' if course.status == 'R' else 'bg-warning' }}">
+                                {% for code, name in course_status %}
+                                    {% if code == course.status %}{{ name }}{% endif %}
+                                {% endfor %}
+                            </span>
+                        </td>
+                        <td class="small">{{ course.program }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('courses.edit', course_id=course.id) }}" class="btn btn-outline-primary" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{{ url_for('results.view_course', course_id=course.id) }}" class="btn btn-outline-info" title="View Results">
+                                    <i class="bi bi-clipboard-data"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            No courses found. 
+                            <a href="{{ url_for('courses.create') }}">Add a course</a> to get started.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% if courses.pages > 1 %}
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center mb-0">
+                {% if courses.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('courses.index', page=courses.prev_num, level=level_filter, program=program_filter, semester=semester_filter) }}">Previous</a>
+                </li>
+                {% endif %}
+                
+                {% for page_num in courses.iter_pages() %}
+                    {% if page_num %}
+                    <li class="page-item {{ 'active' if page_num == courses.page }}">
+                        <a class="page-link" href="{{ url_for('courses.index', page=page_num, level=level_filter, program=program_filter, semester=semester_filter) }}">{{ page_num }}</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if courses.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('courses.index', page=courses.next_num, level=level_filter, program=program_filter, semester=semester_filter) }}">Next</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

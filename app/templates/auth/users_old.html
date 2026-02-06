@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Users - Result Processing System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">User Management</h1>
+        <p class="text-muted">Manage system users and their access levels (HoD Only)</p>
+    </div>
+    <div>
+        <a href="{{ url_for('auth.create_user') }}" class="btn btn-primary">
+            <i class="bi bi-person-plus"></i> Create User Account
+        </a>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <h6 class="card-title">Total Users</h6>
+                <h3>{{ users|length }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <h6 class="card-title">Active Users</h6>
+                <h3>{{ users|selectattr('is_active')|list|length }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <h6 class="card-title">Locked Accounts</h6>
+                <h3>{{ users|selectattr('is_locked')|list|length }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <h6 class="card-title">Pending Password Change</h6>
+                <h3>{{ users|selectattr('must_change_password')|list|length }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-people"></i> All Users
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Email (Username)</th>
+                        <th>Full Name</th>
+                        <th>Role</th>
+                        <th>Program</th>
+                        <th>Level</th>
+                        <th>Status</th>
+                        <th>Created By</th>
+                        <th>Last Login</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr class="{{ 'table-warning' if user.is_locked else '' }}">
+                        <td>
+                            <strong>{{ user.username }}</strong>
+                            {% if user.must_change_password %}
+                            <br><small class="text-info"><i class="bi bi-key"></i> Must change password</small>
+                            {% endif %}
+                        </td>
+                        <td>{{ user.full_name }}</td>
+                        <td>
+                            <span class="badge {{ 'bg-danger' if user.role == 'hod' else 'bg-primary' }}">
+                                {{ 'Head of Department' if user.role == 'hod' else 'Level Adviser' }}
+                            </span>
+                        </td>
+                        <td>{{ user.program or '-' }}</td>
+                        <td>{{ user.level or '-' }}</td>
+                        <td>
+                            {% if user.is_locked %}
+                            <span class="badge bg-danger">
+                                <i class="bi bi-lock-fill"></i> Locked ({{ user.failed_login_attempts }} attempts)
+                            </span>
+                            {% elif user.is_active %}
+                            <span class="badge bg-success">Active</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.created_by %}
+                            <small>{{ user.created_by }}</small>
+                            {% else %}
+                            <small class="text-muted">System</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.last_login %}
+                            {{ user.last_login.strftime('%Y-%m-%d %H:%M') }}
+                            {% if user.last_login_ip %}
+                            <br><small class="text-muted">{{ user.last_login_ip }}</small>
+                            {% endif %}
+                            {% else %}
+                            <span class="text-muted">Never</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('auth.edit_user', user_id=user.id) }}" class="btn btn-outline-primary" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                {% if user.id != current_user.id %}
+                                    {% if user.is_locked %}
+                                    <form action="{{ url_for('auth.unlock_user', user_id=user.id) }}" method="POST" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-outline-success" title="Unlock Account">
+                                            <i class="bi bi-unlock"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    <form action="{{ url_for('auth.toggle_user_status', user_id=user.id) }}" method="POST" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-outline-{{ 'danger' if user.is_active else 'success' }}" 
+                                                title="{{ 'Deactivate' if user.is_active else 'Activate' }}">
+                                            <i class="bi bi-{{ 'person-dash' if user.is_active else 'person-check' }}"></i>
+                                        </button>
+                                    </form>
+                                    <form action="{{ url_for('auth.reset_user_password', user_id=user.id) }}" method="POST" class="d-inline"
+                                          onsubmit="return confirm('Reset password for {{ user.username }}? A new password will be generated.');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-outline-warning" title="Reset Password">
+                                            <i class="bi bi-key"></i>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header bg-info text-white">
+        <i class="bi bi-info-circle"></i> User Management Guide
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h6><i class="bi bi-person-plus text-primary"></i> Creating Users</h6>
+                <ul class="small">
+                    <li>Only HoD can create user accounts</li>
+                    <li>System auto-generates secure passwords</li>
+                    <li>Users must change password on first login</li>
+                    <li>University email serves as username</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6><i class="bi bi-shield-lock text-danger"></i> Account Security</h6>
+                <ul class="small">
+                    <li>Accounts lock after 3 failed login attempts</li>
+                    <li>Only HoD can unlock accounts</li>
+                    <li>Reset password forces password change on next login</li>
+                    <li>All actions are logged for security audit</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

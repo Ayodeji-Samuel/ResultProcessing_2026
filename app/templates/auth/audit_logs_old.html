@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Logs - Result Processing System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Audit Logs</h1>
+        <p class="text-muted">Comprehensive security and activity monitoring (HoD Access Only)</p>
+    </div>
+    <div>
+        <a href="{{ url_for('auth.security_monitor') }}" class="btn btn-outline-danger">
+            <i class="bi bi-shield-exclamation"></i> Security Monitor
+        </a>
+    </div>
+</div>
+
+<!-- Filter Section -->
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-funnel"></i> Filter Logs
+    </div>
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('auth.audit_logs') }}" class="row g-3">
+            <div class="col-md-2">
+                <label class="form-label">Category</label>
+                <select name="category" class="form-select form-select-sm">
+                    <option value="">All Categories</option>
+                    <option value="authentication" {{ 'selected' if request.args.get('category') == 'authentication' }}>Authentication</option>
+                    <option value="user_management" {{ 'selected' if request.args.get('category') == 'user_management' }}>User Management</option>
+                    <option value="data_access" {{ 'selected' if request.args.get('category') == 'data_access' }}>Data Access</option>
+                    <option value="data_modification" {{ 'selected' if request.args.get('category') == 'data_modification' }}>Data Modification</option>
+                    <option value="security" {{ 'selected' if request.args.get('category') == 'security' }}>Security</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Status</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">All Status</option>
+                    <option value="success" {{ 'selected' if request.args.get('status') == 'success' }}>Success</option>
+                    <option value="failure" {{ 'selected' if request.args.get('status') == 'failure' }}>Failure</option>
+                    <option value="warning" {{ 'selected' if request.args.get('status') == 'warning' }}>Warning</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">User</label>
+                <input type="text" name="username" class="form-control form-control-sm" 
+                       placeholder="Username" value="{{ request.args.get('username', '') }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">IP Address</label>
+                <input type="text" name="ip" class="form-control form-control-sm" 
+                       placeholder="IP Address" value="{{ request.args.get('ip', '') }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Action</label>
+                <input type="text" name="action" class="form-control form-control-sm" 
+                       placeholder="e.g., LOGIN, CREATE" value="{{ request.args.get('action', '') }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <div>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-search"></i> Filter
+                    </button>
+                    <a href="{{ url_for('auth.audit_logs') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-x-circle"></i> Clear
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Logs Table -->
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-journal-text"></i> Activity Log ({{ logs.total }} records)
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>User</th>
+                        <th>Category</th>
+                        <th>Action</th>
+                        <th>Resource</th>
+                        <th>Status</th>
+                        <th>Device Info</th>
+                        <th>IP Address</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs.items %}
+                    <tr class="{{ 'table-danger' if log.status == 'failure' else ('table-warning' if log.status == 'warning' else '') }}">
+                        <td class="text-nowrap small">
+                            {{ log.created_at.strftime('%Y-%m-%d') }}<br>
+                            <small class="text-muted">{{ log.created_at.strftime('%H:%M:%S') }}</small>
+                        </td>
+                        <td>
+                            <strong>{{ log.username or 'Unknown' }}</strong>
+                            {% if log.user %}
+                            <br><small class="text-muted">ID: {{ log.user_id }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge 
+                                {% if log.action_category == 'authentication' %}bg-info
+                                {% elif log.action_category == 'security' %}bg-danger
+                                {% elif log.action_category == 'user_management' %}bg-warning text-dark
+                                {% elif log.action_category == 'data_modification' %}bg-primary
+                                {% else %}bg-secondary{% endif %}">
+                                {{ log.action_category or 'other' }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge 
+                                {% if 'LOGIN' in log.action %}bg-info
+                                {% elif 'FAIL' in log.action or 'LOCK' in log.action %}bg-danger
+                                {% elif 'CREATE' in log.action %}bg-success
+                                {% elif 'DELETE' in log.action %}bg-danger
+                                {% elif 'UPDATE' in log.action or 'EDIT' in log.action %}bg-warning text-dark
+                                {% elif 'UNLOCK' in log.action %}bg-success
+                                {% else %}bg-secondary{% endif %}">
+                                {{ log.action }}
+                            </span>
+                        </td>
+                        <td>{{ log.resource or '-' }}</td>
+                        <td>
+                            {% if log.status == 'success' %}
+                            <span class="badge bg-success"><i class="bi bi-check-circle"></i> Success</span>
+                            {% elif log.status == 'failure' %}
+                            <span class="badge bg-danger"><i class="bi bi-x-circle"></i> Failed</span>
+                            {% elif log.status == 'warning' %}
+                            <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> Warning</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ log.status or 'N/A' }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="small">
+                            {% if log.device_type %}
+                            <i class="bi bi-{{ 'phone' if log.device_type == 'Mobile' else ('tablet' if log.device_type == 'Tablet' else 'laptop') }}"></i>
+                            {{ log.device_type }}<br>
+                            {% endif %}
+                            {% if log.browser %}
+                            <small class="text-muted">{{ log.browser }}</small><br>
+                            {% endif %}
+                            {% if log.operating_system %}
+                            <small class="text-muted">{{ log.operating_system }}</small>
+                            {% endif %}
+                        </td>
+                        <td class="small">
+                            {{ log.ip_address or '-' }}
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-info" 
+                                    data-bs-toggle="modal" data-bs-target="#detailModal{{ log.id }}">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            
+                            <!-- Detail Modal -->
+                            <div class="modal fade" id="detailModal{{ log.id }}" tabindex="-1">
+                                <div class="modal-dialog modal-lg">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">
+                                                <i class="bi bi-journal-text"></i> Log Details
+                                            </h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <p><strong>Timestamp:</strong> {{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                                                    <p><strong>User:</strong> {{ log.username or 'Unknown' }}</p>
+                                                    <p><strong>Action:</strong> {{ log.action }}</p>
+                                                    <p><strong>Category:</strong> {{ log.action_category or 'N/A' }}</p>
+                                                    <p><strong>Status:</strong> {{ log.status or 'N/A' }}</p>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <p><strong>IP Address:</strong> {{ log.ip_address or 'N/A' }}</p>
+                                                    <p><strong>Device:</strong> {{ log.device_type or 'N/A' }}</p>
+                                                    <p><strong>Browser:</strong> {{ log.browser or 'N/A' }}</p>
+                                                    <p><strong>OS:</strong> {{ log.operating_system or 'N/A' }}</p>
+                                                    <p><strong>Session ID:</strong> <code>{{ log.session_id or 'N/A' }}</code></p>
+                                                </div>
+                                            </div>
+                                            <hr>
+                                            <p><strong>Resource:</strong> {{ log.resource or 'N/A' }}</p>
+                                            <p><strong>Details:</strong></p>
+                                            <pre class="bg-light p-2 rounded">{{ log.details or 'No additional details' }}</pre>
+                                            {% if log.old_values %}
+                                            <p><strong>Previous Values:</strong></p>
+                                            <pre class="bg-light p-2 rounded text-danger">{{ log.old_values }}</pre>
+                                            {% endif %}
+                                            {% if log.new_values %}
+                                            <p><strong>New Values:</strong></p>
+                                            <pre class="bg-light p-2 rounded text-success">{{ log.new_values }}</pre>
+                                            {% endif %}
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">
+                            <i class="bi bi-inbox display-4"></i>
+                            <p>No audit logs found matching your criteria</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% if logs.pages > 1 %}
+        <nav aria-label="Page navigation" class="mt-3">
+            <ul class="pagination justify-content-center">
+                {% if logs.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('auth.audit_logs', page=logs.prev_num, **request.args) }}">
+                        <i class="bi bi-chevron-left"></i> Previous
+                    </a>
+                </li>
+                {% endif %}
+                
+                {% for page_num in logs.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                    {% if page_num %}
+                    <li class="page-item {{ 'active' if page_num == logs.page }}">
+                        <a class="page-link" href="{{ url_for('auth.audit_logs', page=page_num, **request.args) }}">{{ page_num }}</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if logs.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('auth.audit_logs', page=logs.next_num, **request.args) }}">
+                        Next <i class="bi bi-chevron-right"></i>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

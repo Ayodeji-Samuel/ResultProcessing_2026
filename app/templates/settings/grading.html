@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Grading System - Settings - Result Processing System{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="mb-8">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Grading System Configuration</h1>
+            <p class="text-gray-600">Configure grading scales for different degree programs</p>
+        </div>
+        <a href="{{ url_for('settings.index') }}" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center">
+            <i class="ri-arrow-left-line mr-2"></i>
+            Back to Settings
+        </a>
+    </div>
+</div>
+
+<!-- Degree Type Tabs -->
+<div class="bg-white rounded-xl shadow-sm mb-6">
+    <div class="border-b border-gray-200">
+        <nav class="flex -mb-px" id="gradingTabs" role="tablist">
+            {% for degree in degree_types %}
+            <button class="px-6 py-4 text-sm font-medium border-b-2 {{ 'border-blue-600 text-blue-600' if loop.first else 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} transition-colors" 
+                    id="{{ degree }}-tab" 
+                    data-bs-toggle="tab" 
+                    data-bs-target="#{{ degree }}" 
+                    type="button" 
+                    role="tab"
+                    onclick="switchTab('{{ degree }}', this)">
+                {{ degree }}
+            </button>
+            {% endfor %}
+        </nav>
+    </div>
+</div>
+
+<div class="tab-content" id="gradingTabContent">
+    {% for degree in degree_types %}
+    <div class="tab-pane {{ 'block' if loop.first else 'hidden' }}" id="{{ degree }}" role="tabpanel">
+        <div class="bg-white rounded-xl shadow-sm">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-emerald-50 to-teal-50 flex justify-between items-center">
+                <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+                    <i class="ri-bar-chart-box-line mr-2 text-emerald-600"></i>
+                    {{ degree }} Grading Scale
+                </h2>
+                <a href="{{ url_for('settings.edit_grading', degree_type=degree) }}" 
+                   class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center text-sm">
+                    <i class="ri-edit-line mr-2"></i>
+                    Edit
+                </a>
+            </div>
+            <div class="p-6">
+                {% set grading = grouped_grading.get(degree, []) %}
+                {% if grading %}
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-200">
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Grade</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Min Score</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Max Score</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Grade Point</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Description</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            {% for g in grading %}
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4">
+                                    <span class="px-3 py-1 rounded-full text-sm font-bold 
+                                        {% if g.grade in ['A', 'B'] %}bg-green-100 text-green-800
+                                        {% elif g.grade in ['C', 'D'] %}bg-yellow-100 text-yellow-800
+                                        {% elif g.grade == 'E' %}bg-orange-100 text-orange-800
+                                        {% else %}bg-red-100 text-red-800{% endif %}">
+                                        {{ g.grade }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-900">{{ g.min_score }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-900">{{ g.max_score }}</td>
+                                <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ g.grade_point }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-600">{{ g.description or '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-12">
+                    <i class="ri-bar-chart-line text-gray-300" style="font-size: 64px;"></i>
+                    <p class="text-gray-500 mt-4">No grading scale configured for {{ degree }}</p>
+                    <a href="{{ url_for('settings.edit_grading', degree_type=degree) }}" 
+                       class="mt-4 inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all font-medium shadow-lg">
+                        <i class="ri-add-line mr-2"></i>
+                        Configure Grading
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Guidelines -->
+<div class="mt-6 bg-white rounded-xl shadow-sm">
+    <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
+        <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+            <i class="ri-information-line mr-2 text-blue-600"></i>
+            Grading Guidelines
+        </h2>
+    </div>
+    <div class="p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div class="p-4 bg-green-50 border-l-4 border-green-500 rounded-lg">
+                    <h3 class="font-semibold text-green-900 mb-2">Undergraduate (BSc) Pass Mark</h3>
+                    <p class="text-sm text-green-800">Minimum pass mark: <strong class="text-lg">40</strong> (Grade E or higher)</p>
+                </div>
+                
+                <div class="p-4 bg-blue-50 border-l-4 border-blue-500 rounded-lg">
+                    <h3 class="font-semibold text-blue-900 mb-2">Postgraduate (PGD, MSc) Pass Mark</h3>
+                    <p class="text-sm text-blue-800">Minimum pass mark: <strong class="text-lg">50</strong> (Grade C or higher)</p>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div class="p-4 bg-purple-50 border-l-4 border-purple-500 rounded-lg">
+                    <h3 class="font-semibold text-purple-900 mb-2">Doctoral (PhD) Pass Mark</h3>
+                    <p class="text-sm text-purple-800">Minimum pass mark: <strong class="text-lg">60</strong> (Grade B or higher)</p>
+                </div>
+                
+                <div class="p-4 bg-indigo-50 border-l-4 border-indigo-500 rounded-lg">
+                    <h3 class="font-semibold text-indigo-900 mb-2">GPA Calculation</h3>
+                    <p class="text-sm text-indigo-800">
+                        <code class="bg-white px-2 py-1 rounded text-xs">GPA = Total Grade Points ÷ Total Credit Units</code>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function switchTab(degree, button) {
+    // Hide all tab panes
+    document.querySelectorAll('.tab-pane').forEach(pane => {
+        pane.classList.add('hidden');
+        pane.classList.remove('block');
+    });
+    
+    // Show selected tab pane
+    const targetPane = document.getElementById(degree);
+    if (targetPane) {
+        targetPane.classList.remove('hidden');
+        targetPane.classList.add('block');
+    }
+    
+    // Update button styles
+    document.querySelectorAll('#gradingTabs button').forEach(btn => {
+        btn.classList.remove('border-blue-600', 'text-blue-600');
+        btn.classList.add('border-transparent', 'text-gray-500');
+    });
+    button.classList.remove('border-transparent', 'text-gray-500');
+    button.classList.add('border-blue-600', 'text-blue-600');
+}
+</script>
+{% endblock %}

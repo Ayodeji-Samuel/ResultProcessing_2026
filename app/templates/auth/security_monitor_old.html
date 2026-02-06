@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}Security Monitor - Result Processing System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><i class="bi bi-shield-check"></i> Security Monitor</h1>
+        <p class="text-muted">Monitor system access, track user activities, and manage security</p>
+    </div>
+    <div>
+        <a href="{{ url_for('auth.audit_logs') }}" class="btn btn-primary">
+            <i class="bi bi-journal-text"></i> Full Audit Logs
+        </a>
+    </div>
+</div>
+
+<!-- Security Statistics -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card primary">
+            <div class="card-body text-center">
+                <div class="stat-icon">
+                    <i class="bi bi-people"></i>
+                </div>
+                <h3 class="stat-number">{{ total_users }}</h3>
+                <p class="stat-label">Total Users</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card success">
+            <div class="card-body text-center">
+                <div class="stat-icon">
+                    <i class="bi bi-person-check"></i>
+                </div>
+                <h3 class="stat-number">{{ active_users }}</h3>
+                <p class="stat-label">Active Users</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card danger">
+            <div class="card-body text-center">
+                <div class="stat-icon">
+                    <i class="bi bi-lock"></i>
+                </div>
+                <h3 class="stat-number">{{ locked_users }}</h3>
+                <p class="stat-label">Locked Accounts</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card warning">
+            <div class="card-body text-center">
+                <div class="stat-icon">
+                    <i class="bi bi-exclamation-triangle"></i>
+                </div>
+                <h3 class="stat-number">{{ security_events|length }}</h3>
+                <p class="stat-label">Security Events</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Locked Accounts -->
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-lock-fill"></i> Locked Accounts</h5>
+                <span class="badge bg-light text-danger">{{ locked_accounts|length }}</span>
+            </div>
+            <div class="card-body">
+                {% if locked_accounts %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Email</th>
+                                <th>Failed Attempts</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in locked_accounts %}
+                            <tr>
+                                <td>{{ user.full_name }}</td>
+                                <td class="small">{{ user.email }}</td>
+                                <td>
+                                    <span class="badge bg-danger">{{ user.failed_login_attempts }}</span>
+                                </td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('auth.unlock_user', user_id=user.id) }}" style="display: inline;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-success" title="Unlock Account">
+                                            <i class="bi bi-unlock"></i> Unlock
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="bi bi-shield-check display-4 text-success"></i>
+                    <p class="text-muted mt-2">No locked accounts</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Security Events -->
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-warning d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Security Events</h5>
+                <a href="{{ url_for('auth.audit_logs') }}?category=AUTH" class="btn btn-sm btn-outline-dark">View All</a>
+            </div>
+            <div class="card-body">
+                {% if security_events %}
+                <div class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto;">
+                    {% for event in security_events[:10] %}
+                    <div class="list-group-item px-0">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <span class="badge {{ 'bg-danger' if event.action in ['FAILED_LOGIN', 'ACCOUNT_LOCKED', 'LOCKED_LOGIN_ATTEMPT'] else 'bg-warning text-dark' if event.action == 'RESET_PASSWORD' else 'bg-success' }}">
+                                    {{ event.action }}
+                                </span>
+                                <small class="d-block text-muted mt-1">
+                                    {{ event.username or 'Unknown' }} - {{ event.ip_address }}
+                                </small>
+                                <small class="text-muted">{{ event.details or '' }}</small>
+                            </div>
+                            <small class="text-muted">{{ event.created_at.strftime('%m/%d %H:%M') }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="bi bi-shield-check display-4 text-success"></i>
+                    <p class="text-muted mt-2">No security events</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Login Activity -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-clock-history"></i> Recent Login Activity</h5>
+        <a href="{{ url_for('auth.audit_logs') }}?action=LOGIN" class="btn btn-sm btn-outline-primary">View All</a>
+    </div>
+    <div class="card-body">
+        {% if login_activity %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Time</th>
+                        <th>User</th>
+                        <th>Action</th>
+                        <th>IP Address</th>
+                        <th>Device</th>
+                        <th>Browser</th>
+                        <th>OS</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in login_activity[:20] %}
+                    <tr>
+                        <td class="small">{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td>{{ log.username or 'Unknown' }}</td>
+                        <td>
+                            <span class="badge {{ 'bg-success' if log.action == 'LOGIN' else 'bg-info' if log.action == 'LOGOUT' else 'bg-danger' }}">
+                                {{ log.action }}
+                            </span>
+                        </td>
+                        <td><code>{{ log.ip_address }}</code></td>
+                        <td>
+                            <i class="bi {{ 'bi-phone' if log.device_type == 'mobile' else 'bi-tablet' if log.device_type == 'tablet' else 'bi-display' }}"></i>
+                            {{ log.device_type|capitalize if log.device_type else 'Unknown' }}
+                        </td>
+                        <td>{{ log.browser or 'Unknown' }}</td>
+                        <td>{{ log.operating_system or 'Unknown' }}</td>
+                        <td>
+                            <span class="badge {{ 'bg-success' if log.status == 'success' else 'bg-danger' if log.status == 'failed' else 'bg-warning text-dark' }}">
+                                {{ log.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4">
+            <i class="bi bi-clock display-4 text-muted"></i>
+            <p class="text-muted mt-2">No login activity recorded</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

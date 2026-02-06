@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+
+{% block title %}Spreadsheet Preview - Result Processing System{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="mb-8">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Spreadsheet Preview</h1>
+            <p class="text-gray-600">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2">
+                    {{ program }}
+                </span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mr-2">
+                    {{ level }} Level
+                </span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 mr-2">
+                    {{ 'First' if semester == '1' else 'Second' if semester == '2' else 'Both' }} Semester
+                </span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                    {{ session.session_name }}
+                </span>
+            </p>
+        </div>
+        <div class="flex gap-3">
+            <form method="POST" action="{{ url_for('reports.spreadsheet') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="program" value="{{ program }}">
+                <input type="hidden" name="level" value="{{ level }}">
+                <input type="hidden" name="semester" value="{{ semester }}">
+                <input type="hidden" name="session_id" value="{{ session.id }}">
+                <input type="hidden" name="action" value="download">
+                <button type="submit" class="px-6 py-2.5 bg-gradient-to-r from-primary-600 to-blue-600 text-white rounded-lg hover:from-primary-700 hover:to-blue-700 transition-all font-medium flex items-center shadow-lg">
+                    <i class="ri-download-2-line mr-2"></i>
+                    Download PDF
+                </button>
+            </form>
+            <a href="{{ url_for('reports.spreadsheet') }}" class="px-6 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium flex items-center">
+                <i class="ri-arrow-left-line mr-2"></i>
+                Back
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Summary Stats -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-blue-100 text-sm mb-1">Total Students</p>
+                <h3 class="text-3xl font-bold">{{ students|length }}</h3>
+            </div>
+            <div class="bg-white bg-opacity-20 rounded-full p-3">
+                <i class="ri-user-line text-2xl"></i>
+            </div>
+        </div>
+    </div>
+    
+    <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-green-100 text-sm mb-1">Courses</p>
+                <h3 class="text-3xl font-bold">{{ courses|length }}</h3>
+            </div>
+            <div class="bg-white bg-opacity-20 rounded-full p-3">
+                <i class="ri-book-line text-2xl"></i>
+            </div>
+        </div>
+    </div>
+    
+    <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-purple-100 text-sm mb-1">Total Credits</p>
+                <h3 class="text-3xl font-bold">{{ total_credits }}</h3>
+            </div>
+            <div class="bg-white bg-opacity-20 rounded-full p-3">
+                <i class="ri-award-line text-2xl"></i>
+            </div>
+        </div>
+    </div>
+    
+    <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg p-6 text-white">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-orange-100 text-sm mb-1">Average GPA</p>
+                <h3 class="text-3xl font-bold">
+                    {% if students|length > 0 %}
+                        {{ "%.2f"|format(average_gpa) }}
+                    {% else %}
+                        0.00
+                    {% endif %}
+                </h3>
+            </div>
+            <div class="bg-white bg-opacity-20 rounded-full p-3">
+                <i class="ri-trophy-line text-2xl"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Spreadsheet Preview -->
+<div class="bg-white rounded-xl shadow-sm">
+    <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-blue-50">
+        <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+            <i class="ri-table-line mr-2 text-primary-600"></i>
+            Examination Record Preview
+        </h2>
+    </div>
+    <div class="p-6">
+        {% if students %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 border border-gray-300 text-sm">
+                <thead class="bg-gradient-to-r from-gray-700 to-gray-800 text-white">
+                    <!-- Semester Spanning Row -->
+                    <tr>
+                        <th rowspan="4" class="px-3 py-3 text-center border-r border-gray-600 font-semibold align-middle">S/N</th>
+                        <th rowspan="4" class="px-4 py-3 text-left border-r border-gray-600 font-semibold align-middle">Matric No</th>
+                        <th rowspan="4" class="px-4 py-3 text-left border-r border-gray-600 font-semibold align-middle">Name</th>
+                        <th colspan="{{ (courses|length * 4) + 4 }}" class="px-4 py-2 text-center border-r border-gray-600 font-bold bg-primary-700 text-lg">
+                            {{ 'FIRST SEMESTER' if semester == '1' else 'SECOND SEMESTER' if semester == '2' else 'BOTH SEMESTERS' }}
+                        </th>
+                        <th rowspan="4" class="px-3 py-3 text-center font-semibold align-middle">Remarks</th>
+                    </tr>
+                    <!-- Course Headers Row (Vertical Text) -->
+                    <tr>
+                        {% for course in courses %}
+                        <th colspan="4" class="px-2 py-2 text-center border-l border-r border-gray-600 font-semibold align-bottom" style="height: 140px; position: relative;">
+                            <div class="vertical-text-container">
+                                <span class="vertical-text-bottomup font-bold text-xs">{{ course.course_code }}: {{ course.course_title[:25] }}{% if course.course_title|length > 25 %}...{% endif %}</span>
+                            </div>
+                        </th>
+                        {% endfor %}
+                        <th class="px-2 py-2 text-center border-l border-gray-600 font-semibold" style="height: 140px;">
+                            <div class="vertical-text-container">
+                                <span class="vertical-text-bottomup text-xs">Credit Unit Passed</span>
+                            </div>
+                        </th>
+                        <th class="px-2 py-2 text-center border-l border-gray-600 font-semibold" style="height: 140px;">
+                            <div class="vertical-text-container">
+                                <span class="vertical-text-bottomup text-xs">Credit Unit Failed</span>
+                            </div>
+                        </th>
+                        <th class="px-2 py-2 text-center border-l border-gray-600 font-semibold" style="height: 140px;">
+                            <div class="vertical-text-container">
+                                <span class="vertical-text-bottomup text-xs">Total Credit Unit</span>
+                            </div>
+                        </th>
+                        <th class="px-2 py-2 text-center border-l border-r border-gray-600 font-semibold" style="height: 140px;">
+                            <div class="vertical-text-container">
+                                <span class="vertical-text-bottomup text-xs">GPA</span>
+                            </div>
+                        </th>
+                    </tr>
+                    <!-- Course Status Row (C, R, E) -->
+                    <tr>
+                        {% for course in courses %}
+                        <th colspan="4" class="px-2 py-1 text-center border-l border-r border-gray-600 text-xs font-semibold">
+                            {{ course.status }} ({{ course.credit_unit }} CU)
+                        </th>
+                        {% endfor %}
+                        <th class="px-2 py-1 text-center border-l border-gray-600 text-xs"></th>
+                        <th class="px-2 py-1 text-center border-l border-gray-600 text-xs"></th>
+                        <th class="px-2 py-1 text-center border-l border-gray-600 text-xs"></th>
+                        <th class="px-2 py-1 text-center border-l border-r border-gray-600 text-xs"></th>
+                    </tr>
+                    <!-- Sub-headers Row (CA, Ex, Tot, Gr) -->
+                    <tr>
+                        {% for course in courses %}
+                        <th class="px-2 py-2 text-center border-l border-gray-600 text-xs">CA</th>
+                        <th class="px-2 py-2 text-center border-l border-gray-600 text-xs">Ex</th>
+                        <th class="px-2 py-2 text-center border-l border-gray-600 text-xs">Tot</th>
+                        <th class="px-2 py-2 text-center border-l border-r border-gray-600 text-xs">Gr</th>
+                        {% endfor %}
+                        <th class="px-2 py-2 text-center border-l border-gray-600 text-xs">CUP</th>
+                        <th class="px-2 py-2 text-center border-l border-gray-600 text-xs">CUF</th>
+                        <th class="px-2 py-2 text-center border-l border-gray-600 text-xs">TCU</th>
+                        <th class="px-2 py-2 text-center border-l border-r border-gray-600 text-xs">GPA</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for data in student_data %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-3 py-3 text-center border-r border-gray-200 font-medium text-gray-900">{{ loop.index }}</td>
+                        <td class="px-4 py-3 border-r border-gray-200 font-medium text-gray-900">{{ data.student.matric_number }}</td>
+                        <td class="px-4 py-3 border-r border-gray-200 text-gray-700">{{ data.student.surname }}, {{ data.student.first_name }}</td>
+                        {% for course in courses %}
+                        {% set result = data.results.get(course.id) %}
+                        <td class="px-2 py-3 text-center border-l border-gray-200 text-gray-700">{{ result.ca_score|round(1) if result and result.ca_score else '-' }}</td>
+                        <td class="px-2 py-3 text-center border-l border-gray-200 text-gray-700">{{ result.exam_score|round(1) if result and result.exam_score else '-' }}</td>
+                        <td class="px-2 py-3 text-center border-l border-gray-200 font-medium text-gray-900">{{ result.total_score|round(1) if result and result.total_score else '-' }}</td>
+                        <td class="px-2 py-3 text-center border-l border-r border-gray-200">
+                            {% if result and result.grade %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold
+                                {{ 'bg-green-100 text-green-800' if result.grade in ['A', 'B'] else 
+                                   'bg-yellow-100 text-yellow-800' if result.grade in ['C', 'D'] else 
+                                   'bg-gray-100 text-gray-800' if result.grade == 'E' else 
+                                   'bg-red-100 text-red-800' }}">
+                                {{ result.grade }}
+                            </span>
+                            {% else %}-{% endif %}
+                        </td>
+                        {% endfor %}
+                        <td class="px-3 py-3 text-center border-l border-gray-200 font-bold text-green-600">{{ data.cup }}</td>
+                        <td class="px-3 py-3 text-center border-l border-gray-200 font-bold text-red-600">{{ data.cuf }}</td>
+                        <td class="px-3 py-3 text-center border-l border-gray-200 font-bold text-gray-900">{{ data.tcu }}</td>
+                        <td class="px-3 py-3 text-center border-l border-r border-gray-200 font-bold text-primary-600">{{ "%.2f"|format(data.gpa) }}</td>
+                        <td class="px-3 py-3 text-center text-sm">
+                            {% if data.remark and data.remark.startswith('CO:') %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">{{ data.remark }}</span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{{ data.remark }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Course Legend -->
+        <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+            <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                <i class="ri-information-line mr-2 text-blue-600"></i>
+                Course Legend
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {% for course in courses %}
+                <div class="flex items-start p-2 bg-white rounded border border-gray-200">
+                    <span class="inline-flex items-center justify-center px-2 py-1 mr-2 text-xs font-bold text-primary-700 bg-primary-100 rounded">
+                        {{ course.course_code }}
+                    </span>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm text-gray-900 font-medium truncate">{{ course.course_title }}</p>
+                        <p class="text-xs text-gray-500">{{ course.credit_unit }} Credit Unit{{ 's' if course.credit_unit != 1 else '' }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-16">
+            <i class="ri-file-list-line text-6xl text-gray-300 mb-4"></i>
+            <p class="text-gray-500 text-lg mb-4">No students found for the selected criteria</p>
+            <a href="{{ url_for('students.index') }}" class="inline-flex items-center px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium">
+                <i class="ri-add-line mr-2"></i>
+                Add Students
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Grade Legend -->
+<div class="bg-white rounded-xl shadow-sm mt-6">
+    <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-blue-50">
+        <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+            <i class="ri-bookmark-line mr-2 text-primary-600"></i>
+            Grading Key
+        </h2>
+    </div>
+    <div class="p-6">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div class="text-center p-4 bg-green-50 rounded-lg border border-green-200">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-green-100 text-green-800 mb-2">A</span>
+                <p class="text-xs text-gray-600 font-medium">70-100</p>
+                <p class="text-xs text-gray-500">(5 points)</p>
+            </div>
+            <div class="text-center p-4 bg-green-50 rounded-lg border border-green-200">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-green-100 text-green-800 mb-2">B</span>
+                <p class="text-xs text-gray-600 font-medium">60-69</p>
+                <p class="text-xs text-gray-500">(4 points)</p>
+            </div>
+            <div class="text-center p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-yellow-100 text-yellow-800 mb-2">C</span>
+                <p class="text-xs text-gray-600 font-medium">50-59</p>
+                <p class="text-xs text-gray-500">(3 points)</p>
+            </div>
+            <div class="text-center p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-yellow-100 text-yellow-800 mb-2">D</span>
+                <p class="text-xs text-gray-600 font-medium">45-49</p>
+                <p class="text-xs text-gray-500">(2 points)</p>
+            </div>
+            <div class="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-gray-100 text-gray-800 mb-2">E</span>
+                <p class="text-xs text-gray-600 font-medium">40-44</p>
+                <p class="text-xs text-gray-500">(1 point)</p>
+            </div>
+            <div class="text-center p-4 bg-red-50 rounded-lg border border-red-200">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-red-100 text-red-800 mb-2">F</span>
+                <p class="text-xs text-gray-600 font-medium">0-39</p>
+                <p class="text-xs text-gray-500">(0 points)</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Vertical text styling for table headers - bottom to top reading */
+    .vertical-text-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        min-height: 120px;
+    }
+    
+    .vertical-text-bottomup {
+        writing-mode: vertical-lr;
+        text-orientation: mixed;
+        transform: rotate(180deg);
+        white-space: nowrap;
+        display: inline-block;
+    }
+    
+    /* Old vertical text class for backward compatibility */
+    .vertical-text {
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        transform: rotate(180deg);
+        white-space: nowrap;
+    }
+    
+    .vertical-text-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        min-height: 100px;
+    }
+    
+    /* Ensure proper alignment for header cells */
+    thead th {
+        vertical-align: bottom;
+    }
+    
+    /* Style for the semester header */
+    .semester-header {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Result Processing System{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900 mb-2">Settings</h1>
+    <p class="text-gray-600">Configure system settings and preferences</p>
+</div>
+
+<!-- Settings Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+    <!-- Grading System -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
+        <div class="bg-gradient-to-r from-blue-500 to-blue-600 p-6">
+            <div class="flex items-center justify-center w-12 h-12 bg-white/20 rounded-lg mb-4">
+                <i class="ri-calculator-line text-2xl text-white"></i>
+            </div>
+            <h3 class="text-xl font-semibold text-white mb-2">Grading System</h3>
+            <p class="text-blue-100 text-sm">Configure grading scales</p>
+        </div>
+        <div class="p-6">
+            <p class="text-gray-600 text-sm mb-4">Configure grading scales for different degree programs (BSc, PGD, MSc, PhD).</p>
+            <ul class="text-sm text-gray-500 space-y-2 mb-6">
+                <li class="flex items-start">
+                    <i class="ri-check-line text-green-500 mr-2 mt-0.5"></i>
+                    <span>Set minimum scores for each grade</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-check-line text-green-500 mr-2 mt-0.5"></i>
+                    <span>Configure grade points</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-check-line text-green-500 mr-2 mt-0.5"></i>
+                    <span>Customize for each degree type</span>
+                </li>
+            </ul>
+            <a href="{{ url_for('settings.grading') }}" class="flex items-center justify-center w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                <i class="ri-settings-3-line mr-2"></i>
+                Configure Grading
+            </a>
+        </div>
+    </div>
+    
+    <!-- University Logo -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
+        <div class="bg-gradient-to-r from-green-500 to-green-600 p-6">
+            <div class="flex items-center justify-center w-12 h-12 bg-white/20 rounded-lg mb-4">
+                <i class="ri-image-line text-2xl text-white"></i>
+            </div>
+            <h3 class="text-xl font-semibold text-white mb-2">University Logo</h3>
+            <p class="text-green-100 text-sm">Manage institutional branding</p>
+        </div>
+        <div class="p-6">
+            <p class="text-gray-600 text-sm mb-4">Upload or change the university logo that appears on result sheets and spreadsheets.</p>
+            <ul class="text-sm text-gray-500 space-y-2 mb-6">
+                <li class="flex items-start">
+                    <i class="ri-check-line text-green-500 mr-2 mt-0.5"></i>
+                    <span>Supported formats: PNG, JPG</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-check-line text-green-500 mr-2 mt-0.5"></i>
+                    <span>Recommended size: 200x200px</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-check-line text-green-500 mr-2 mt-0.5"></i>
+                    <span>Used in PDF headers</span>
+                </li>
+            </ul>
+            <a href="{{ url_for('settings.logo') }}" class="flex items-center justify-center w-full px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
+                <i class="ri-upload-2-line mr-2"></i>
+                Manage Logo
+            </a>
+        </div>
+    </div>
+    
+    <!-- System Settings -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
+        <div class="bg-gradient-to-r from-purple-500 to-purple-600 p-6">
+            <div class="flex items-center justify-center w-12 h-12 bg-white/20 rounded-lg mb-4">
+                <i class="ri-settings-4-line text-2xl text-white"></i>
+            </div>
+            <h3 class="text-xl font-semibold text-white mb-2">System Settings</h3>
+            <p class="text-purple-100 text-sm">General configurations</p>
+        </div>
+        <div class="p-6">
+            <p class="text-gray-600 text-sm mb-4">Configure general system settings and preferences.</p>
+            <ul class="text-sm text-gray-500 space-y-2 mb-6">
+                <li class="flex items-start">
+                    <i class="ri-check-line text-green-500 mr-2 mt-0.5"></i>
+                    <span>University name</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-check-line text-green-500 mr-2 mt-0.5"></i>
+                    <span>Department name</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-check-line text-green-500 mr-2 mt-0.5"></i>
+                    <span>Faculty name</span>
+                </li>
+            </ul>
+            <a href="{{ url_for('settings.system') }}" class="flex items-center justify-center w-full px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium">
+                <i class="ri-tools-line mr-2"></i>
+                System Settings
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Current Configuration -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
+    <div class="border-b border-gray-200 bg-gray-50 px-6 py-4">
+        <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+            <i class="ri-information-line text-blue-500 mr-2"></i>
+            Current Configuration
+        </h2>
+    </div>
+    <div class="p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Institution Details -->
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Institution Details</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                        <span class="text-gray-600 text-sm">University:</span>
+                        <span class="font-medium text-gray-900">{{ config.UNIVERSITY_NAME }}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                        <span class="text-gray-600 text-sm">Faculty:</span>
+                        <span class="font-medium text-gray-900">{{ config.FACULTY_NAME }}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                        <span class="text-gray-600 text-sm">Department:</span>
+                        <span class="font-medium text-gray-900">{{ config.DEPARTMENT_NAME }}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2">
+                        <span class="text-gray-600 text-sm">Current Session:</span>
+                        <span class="font-medium text-blue-600">{{ current_session.session_name if current_session else 'Not Set' }}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Programs & Levels -->
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Programs & Levels</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-gray-600 text-sm mb-2 block">Available Programs:</label>
+                        <div class="flex flex-wrap gap-2">
+                            {% for program in config.PROGRAMS %}
+                            <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
+                                {{ program[0] if program is iterable and program is not string else program }}
+                            </span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-gray-600 text-sm mb-2 block">Levels:</label>
+                        <div class="flex flex-wrap gap-2">
+                            {% for level in config.LEVELS %}
+                            <span class="px-3 py-1 bg-green-50 text-green-700 rounded-full text-xs font-medium">
+                                {{ level }} Level
+                            </span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Grading Scale Overview -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="border-b border-gray-200 bg-gray-50 px-6 py-4">
+        <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+            <i class="ri-bar-chart-line text-purple-500 mr-2"></i>
+            Default Grading Scale (BSc)
+        </h2>
+    </div>
+    <div class="p-6">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                    <tr class="bg-gray-50">
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score Range</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade Point</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800">A</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">70 - 100</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">5.0</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">Excellent</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 text-xs rounded-full bg-green-50 text-green-700">Pass</span>
+                        </td>
+                    </tr>
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800">B</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">60 - 69</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">4.0</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">Very Good</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 text-xs rounded-full bg-green-50 text-green-700">Pass</span>
+                        </td>
+                    </tr>
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-800">C</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">50 - 59</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">3.0</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">Good</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 text-xs rounded-full bg-green-50 text-green-700">Pass</span>
+                        </td>
+                    </tr>
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-800">D</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">45 - 49</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2.0</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">Fair</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 text-xs rounded-full bg-green-50 text-green-700">Pass</span>
+                        </td>
+                    </tr>
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-gray-100 text-gray-800">E</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">40 - 44</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">1.0</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">Pass</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 text-xs rounded-full bg-green-50 text-green-700">Pass</span>
+                        </td>
+                    </tr>
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-red-100 text-red-800">F</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">0 - 39</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">0.0</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">Fail</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 text-xs rounded-full bg-red-50 text-red-700">Fail</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div class="flex items-start">
+                <i class="ri-information-line text-blue-500 text-xl mr-3 mt-0.5"></i>
+                <p class="text-sm text-blue-900">
+                    This is the default BSc grading scale. Different degree programs may have different minimum pass marks. 
+                    You can customize these settings in the <a href="{{ url_for('settings.grading') }}" class="font-medium underline hover:text-blue-700">Grading System</a> page.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

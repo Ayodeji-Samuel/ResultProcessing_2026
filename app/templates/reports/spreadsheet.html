@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+
+{% block title %}Generate Spreadsheet - Result Processing System{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="mb-8">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Generate Examination Spreadsheet</h1>
+            <p class="text-gray-600">Create a comprehensive examination record sheet in PDF format</p>
+        </div>
+        <a href="{{ url_for('reports.index') }}" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center">
+            <i class="ri-arrow-left-line mr-2"></i>
+            Back to Reports
+        </a>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main Form -->
+    <div class="lg:col-span-2">
+        <div class="bg-white rounded-xl shadow-sm">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-blue-50">
+                <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+                    <i class="ri-file-list-3-line mr-2 text-primary-600"></i>
+                    Spreadsheet Configuration
+                </h2>
+            </div>
+            <div class="p-6">
+                <form method="POST" action="{{ url_for('reports.spreadsheet') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <!-- Required Fields Section -->
+                    <div class="mb-6">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center">
+                            <span class="w-6 h-6 bg-primary-600 text-white rounded-full flex items-center justify-center text-xs mr-2">1</span>
+                            Basic Information
+                        </h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="program" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Program <span class="text-red-500">*</span>
+                                </label>
+                                <select name="program" id="program" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" required>
+                                    <option value="">-- Select Program --</option>
+                                    {% for prog_id, prog_name in programs %}
+                                    <option value="{{ prog_id }}" {{ 'selected' if request.args.get('program') == prog_id }}>
+                                        {{ prog_name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label for="level" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Level <span class="text-red-500">*</span>
+                                </label>
+                                <select name="level" id="level" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" required>
+                                    <option value="">-- Select Level --</option>
+                                    {% for lvl in levels %}
+                                    <option value="{{ lvl }}" {{ 'selected' if request.args.get('level')|string == lvl|string }}>
+                                        {{ lvl }} Level
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Semester and Session Section -->
+                    <div class="mb-6">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center">
+                            <span class="w-6 h-6 bg-primary-600 text-white rounded-full flex items-center justify-center text-xs mr-2">2</span>
+                            Academic Period
+                        </h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="semester" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Semester <span class="text-red-500">*</span>
+                                </label>
+                                <select name="semester" id="semester" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" required>
+                                    <option value="">-- Select Semester --</option>
+                                    <option value="1" {{ 'selected' if request.args.get('semester') == '1' }}>First Semester</option>
+                                    <option value="2" {{ 'selected' if request.args.get('semester') == '2' }}>Second Semester</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label for="session_id" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Academic Session <span class="text-red-500">*</span>
+                                </label>
+                                <select name="session_id" id="session_id" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" required>
+                                    {% for session in sessions %}
+                                    <option value="{{ session.id }}" {{ 'selected' if session.is_current }}>
+                                        {{ session.session_name }} {{ '(Current)' if session.is_current }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Options Section -->
+                    <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center">
+                            <span class="w-6 h-6 bg-primary-600 text-white rounded-full flex items-center justify-center text-xs mr-2">3</span>
+                            Additional Options
+                        </h3>
+                        
+                        <div class="grid grid-cols-1 gap-4">
+                            <div>
+                                <label for="dean_name" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Dean's Name <span class="text-red-500">*</span>
+                                </label>
+                                <input type="text" name="dean_name" id="dean_name" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="Enter Dean's full name" required>
+                            </div>
+                            
+                            <div class="flex items-center">
+                                <input type="checkbox" name="include_logo" id="include_logo" checked class="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 focus:ring-2">
+                                <label for="include_logo" class="ml-3 text-sm font-medium text-gray-700 flex items-center">
+                                    <i class="ri-image-line mr-1 text-primary-600"></i>
+                                    Include University Logo
+                                </label>
+                            </div>
+                            
+                            <div class="flex items-center">
+                                <input type="checkbox" name="include_signature" id="include_signature" checked class="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 focus:ring-2">
+                                <label for="include_signature" class="ml-3 text-sm font-medium text-gray-700 flex items-center">
+                                    <i class="ri-quill-pen-line mr-1 text-primary-600"></i>
+                                    Include Signature Section
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="flex space-x-3 pt-4 border-t border-gray-200">
+                        <button type="submit" name="action" value="preview" class="flex-1 px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium flex items-center justify-center">
+                            <i class="ri-eye-line mr-2"></i>
+                            Preview
+                        </button>
+                        <button type="submit" name="action" value="download" class="flex-1 px-6 py-3 bg-gradient-to-r from-primary-600 to-blue-600 text-white rounded-lg hover:from-primary-700 hover:to-blue-700 transition-all font-medium flex items-center justify-center shadow-lg">
+                            <i class="ri-download-2-line mr-2"></i>
+                            Generate PDF
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sidebar -->
+    <div class="lg:col-span-1 space-y-6">
+        <!-- Information Card -->
+        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
+            <h3 class="text-lg font-semibold mb-4 flex items-center">
+                <i class="ri-information-line mr-2"></i>
+                Spreadsheet Contents
+            </h3>
+            <ul class="space-y-2 text-sm">
+                <li class="flex items-start">
+                    <i class="ri-check-line mr-2 mt-0.5"></i>
+                    <span>University header with logo</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-check-line mr-2 mt-0.5"></i>
+                    <span>Student list (sorted by matric)</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-check-line mr-2 mt-0.5"></i>
+                    <span>All courses for semester</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-check-line mr-2 mt-0.5"></i>
+                    <span>CA, Exam, Total & Grades</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-check-line mr-2 mt-0.5"></i>
+                    <span>Credit Units & Grade Points</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-check-line mr-2 mt-0.5"></i>
+                    <span>GPA calculation</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-check-line mr-2 mt-0.5"></i>
+                    <span>Academic remarks</span>
+                </li>
+            </ul>
+            
+            <div class="mt-4 pt-4 border-t border-blue-400">
+                <div class="flex items-center text-blue-100">
+                    <i class="ri-file-pdf-line text-2xl mr-2"></i>
+                    <div>
+                        <p class="text-xs">Format</p>
+                        <p class="font-semibold">Landscape A4</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Data Summary Card -->
+        <div class="bg-white rounded-xl shadow-sm">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                    <i class="ri-bar-chart-box-line mr-2 text-green-600"></i>
+                    Data Summary
+                </h3>
+            </div>
+            <div class="p-6" id="dataSummary">
+                <div class="text-center py-8">
+                    <i class="ri-file-list-3-line text-4xl text-gray-300 mb-2"></i>
+                    <p class="text-sm text-gray-500">Select options to see summary</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tips Card -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <i class="ri-lightbulb-line mr-2 text-yellow-500"></i>
+                Quick Tips
+            </h3>
+            <ul class="space-y-2 text-sm text-gray-600">
+                <li class="flex items-start">
+                    <i class="ri-arrow-right-s-line text-primary-600 mr-1 mt-0.5"></i>
+                    <span>Preview before generating final PDF</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-arrow-right-s-line text-primary-600 mr-1 mt-0.5"></i>
+                    <span>Ensure all results are uploaded</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-arrow-right-s-line text-primary-600 mr-1 mt-0.5"></i>
+                    <span>Best printed on A4 landscape</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: .5; }
+    }
+    .animate-pulse {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Update data summary when filters change
+document.querySelectorAll('#program, #level, #semester, #session_id').forEach(select => {
+    select.addEventListener('change', updateSummary);
+});
+
+function updateSummary() {
+    const program = document.getElementById('program').value;
+    const level = document.getElementById('level').value;
+    const semester = document.getElementById('semester').value;
+    const sessionId = document.getElementById('session_id').value;
+    const summaryDiv = document.getElementById('dataSummary');
+    
+    if (!program || !level || !semester) {
+        summaryDiv.innerHTML = `
+            <div class="text-center py-8">
+                <i class="ri-file-list-3-line text-4xl text-gray-300 mb-2"></i>
+                <p class="text-sm text-gray-500">Select all options to see summary</p>
+            </div>
+        `;
+        return;
+    }
+    
+    summaryDiv.innerHTML = `
+        <div class="text-center py-8">
+            <div class="inline-block animate-pulse">
+                <i class="ri-loader-4-line text-4xl text-primary-600"></i>
+            </div>
+            <p class="text-sm text-gray-500 mt-2">Loading summary...</p>
+        </div>
+    `;
+    
+    // Fetch actual data from server
+    const params = new URLSearchParams({
+        program: program,
+        level: level,
+        semester: semester,
+        session_id: sessionId
+    });
+    
+    fetch(`/reports/api/spreadsheet_summary?${params}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to fetch summary');
+            }
+            return response.json();
+        })
+        .then(data => {
+            summaryDiv.innerHTML = `
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                        <div class="flex items-center">
+                            <i class="ri-user-line text-blue-600 mr-2"></i>
+                            <span class="text-sm text-gray-700">Students</span>
+                        </div>
+                        <span class="text-lg font-bold text-blue-600">${data.students}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                        <div class="flex items-center">
+                            <i class="ri-book-line text-green-600 mr-2"></i>
+                            <span class="text-sm text-gray-700">Courses</span>
+                        </div>
+                        <span class="text-lg font-bold text-green-600">${data.courses}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                        <div class="flex items-center">
+                            <i class="ri-file-text-line text-purple-600 mr-2"></i>
+                            <span class="text-sm text-gray-700">Results</span>
+                        </div>
+                        <span class="text-lg font-bold text-purple-600">${data.results}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+                        <div class="flex items-center">
+                            <i class="ri-award-line text-orange-600 mr-2"></i>
+                            <span class="text-sm text-gray-700">Total Units</span>
+                        </div>
+                        <span class="text-lg font-bold text-orange-600">${data.total_units}</span>
+                    </div>
+                </div>
+            `;
+        })
+        .catch(error => {
+            console.error('Error fetching summary:', error);
+            summaryDiv.innerHTML = `
+                <div class="text-center py-8">
+                    <i class="ri-error-warning-line text-4xl text-red-400 mb-2"></i>
+                    <p class="text-sm text-red-500">Failed to load summary</p>
+                </div>
+            `;
+        });
+}
+</script>
+{% endblock %}

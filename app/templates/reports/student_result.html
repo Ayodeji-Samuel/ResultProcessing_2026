@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Student Result - Result Processing System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Generate Student Result</h1>
+        <p class="text-muted">Create an individual result sheet for a student</p>
+    </div>
+    <div>
+        <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Reports
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <!-- Search Form -->
+                <form method="GET" action="{{ url_for('reports.index') }}" class="mb-4">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <label class="form-label">Search Student</label>
+                            <input type="text" name="q" class="form-control" 
+                                   placeholder="Enter matric number or name..."
+                                   value="{{ request.args.get('q', '') }}">
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search"></i> Search
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                
+                {% if students %}
+                <!-- Search Results -->
+                <h6 class="mb-3">Select Student</h6>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Matric Number</th>
+                                <th>Name</th>
+                                <th>Program</th>
+                                <th>Level</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for student in students %}
+                            <tr>
+                                <td>{{ student.matric_number }}</td>
+                                <td>{{ student.full_name }}</td>
+                                <td>{{ student.program }}</td>
+                                <td>{{ student.level }}</td>
+                                <td>
+                                    <a href="{{ url_for('reports.generate_student_result', student_id=student.id) }}" 
+                                       class="btn btn-sm btn-success">
+                                        <i class="bi bi-file-pdf"></i> Generate
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% elif request.args.get('q') %}
+                <div class="text-center py-4">
+                    <i class="bi bi-search display-4 text-muted"></i>
+                    <p class="text-muted mt-3">No students found matching "{{ request.args.get('q') }}"</p>
+                </div>
+                {% endif %}
+                
+                <!-- Or Select from List -->
+                <hr class="my-4">
+                
+                <h6 class="mb-3">Or Select from List</h6>
+                <form method="GET" action="{{ url_for('students.index') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="program" class="form-label">Program</label>
+                            <select name="program" id="program" class="form-select">
+                                <option value="">-- All Programs --</option>
+                                {% for prog_id, prog_name in programs %}
+                                <option value="{{ prog_id }}">{{ prog_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="level" class="form-label">Level</label>
+                            <select name="level" id="level" class="form-select">
+                                <option value="">-- All Levels --</option>
+                                {% for lvl in levels %}
+                                <option value="{{ lvl }}">{{ lvl }} Level</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="student_id" class="form-label">Student <span class="text-danger">*</span></label>
+                        <select name="student_id" id="student_id" class="form-select" required>
+                            <option value="">-- Select Student --</option>
+                            {% for student in all_students %}
+                            <option value="{{ student.id }}" data-program="{{ student.program }}" data-level="{{ student.level }}">
+                                {{ student.matric_number }} - {{ student.full_name }} ({{ student.program }}, {{ student.level }}L)
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="semester" class="form-label">Semester <span class="text-danger">*</span></label>
+                            <select name="semester" id="semester" class="form-select" required>
+                                <option value="">-- Select Semester --</option>
+                                <option value="1">First Semester</option>
+                                <option value="2">Second Semester</option>
+                                <option value="both">Both Semesters</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="session_id" class="form-label">Academic Session <span class="text-danger">*</span></label>
+                            <select name="session_id" id="session_id" class="form-select" required>
+                                {% for session in sessions %}
+                                <option value="{{ session.id }}" {{ 'selected' if session.is_current }}>
+                                    {{ session.session_name }} {{ '(Current)' if session.is_current }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-file-pdf"></i> Generate Result PDF
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card bg-light">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> About Student Results</h5>
+            </div>
+            <div class="card-body">
+                <p class="small">The student result PDF includes:</p>
+                <ul class="small">
+                    <li>Official university header</li>
+                    <li>Student personal information</li>
+                    <li>Complete course breakdown</li>
+                    <li>CA, Exam, and Total scores</li>
+                    <li>Letter grades and grade points</li>
+                    <li>Semester GPA calculation</li>
+                    <li>Academic standing/remarks</li>
+                </ul>
+                
+                <div class="alert alert-info small">
+                    <i class="bi bi-file-pdf"></i>
+                    Results are generated in <strong>portrait A4</strong> format.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Filter students based on program and level selection
+const programSelect = document.getElementById('program');
+const levelSelect = document.getElementById('level');
+const studentSelect = document.getElementById('student_id');
+const allOptions = Array.from(studentSelect.options);
+
+function filterStudents() {
+    const selectedProgram = programSelect.value;
+    const selectedLevel = levelSelect.value;
+    
+    // Clear current options
+    studentSelect.innerHTML = '<option value="">-- Select Student --</option>';
+    
+    // Filter and add matching options
+    allOptions.forEach(option => {
+        if (option.value === '') return;
+        
+        const program = option.dataset.program;
+        const level = option.dataset.level;
+        
+        const programMatch = !selectedProgram || program === selectedProgram;
+        const levelMatch = !selectedLevel || level === selectedLevel;
+        
+        if (programMatch && levelMatch) {
+            studentSelect.appendChild(option.cloneNode(true));
+        }
+    });
+}
+
+programSelect.addEventListener('change', filterStudents);
+levelSelect.addEventListener('change', filterStudents);
+</script>
+{% endblock %}

@@ -1,0 +1,522 @@
+{% extends "base.html" %}
+
+{% block title %}{{ student.full_name }} - Result Processing System{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="mb-6">
+    <nav class="text-sm mb-4">
+        <ol class="flex items-center space-x-2 text-gray-500">
+            <li><a href="{{ url_for('students.index') }}" class="hover:text-gray-700">Students</a></li>
+            <li><i class="ri-arrow-right-s-line"></i></li>
+            <li class="text-gray-900 font-medium">{{ student.matric_number }}</li>
+        </ol>
+    </nav>
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Student Profile</h1>
+            <p class="text-gray-600">Comprehensive academic record and performance tracking</p>
+        </div>
+        <div class="flex space-x-3">
+            <a href="{{ url_for('students.edit', student_id=student.id) }}" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center">
+                <i class="ri-pencil-line mr-2"></i>
+                Edit
+            </a>
+            <div x-data="{ openReport: false }" class="relative">
+                <button @click="openReport = !openReport" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center">
+                    <i class="ri-file-pdf-line mr-2"></i>
+                    Generate Report
+                    <i class="ri-arrow-down-s-line ml-2"></i>
+                </button>
+                <div x-show="openReport" @click.away="openReport = false" x-cloak
+                     class="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg py-1 border border-gray-200 z-10">
+                    <a href="{{ url_for('reports.student_result', student_id=student.id) }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                        View Report Page
+                    </a>
+                    <a href="{{ url_for('reports.student_result_pdf', student_id=student.id) }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                        Download PDF (All Semesters)
+                    </a>
+                    <a href="{{ url_for('reports.student_result_pdf', student_id=student.id) }}?semester=1" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                        Download PDF (First Semester)
+                    </a>
+                    <a href="{{ url_for('reports.student_result_pdf', student_id=student.id) }}?semester=2" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                        Download PDF (Second Semester)
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Student Profile Section -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <!-- Profile Card -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div class="text-center">
+            <div class="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white text-3xl font-bold mb-4 shadow-lg">
+                {{ student.surname[0] }}{{ student.first_name[0] }}
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 mb-1">{{ student.full_name }}</h3>
+            <p class="text-gray-600 mb-4">{{ student.matric_number }}</p>
+            
+            <div class="flex justify-center gap-2 mb-4">
+                <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">{{ student.level }} Level</span>
+                <span class="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-medium">{{ student.program }}</span>
+            </div>
+            
+            <div class="border-t border-gray-200 pt-4 space-y-3">
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-gray-600">Session</span>
+                    <span class="font-medium text-gray-900">{{ student.session.session_name }}</span>
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-gray-600">Status</span>
+                    <span class="px-2 py-1 {{ 'bg-green-100 text-green-800' if student.is_active else 'bg-red-100 text-red-800' }} rounded-full text-xs font-medium">
+                        {{ 'Active' if student.is_active else 'Inactive' }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Statistics Cards -->
+    <div class="lg:col-span-2 grid grid-cols-2 gap-4">
+        <!-- CGPA Card -->
+        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white relative overflow-hidden">
+            <div class="absolute top-0 right-0 opacity-10">
+                <i class="ri-trophy-line text-8xl"></i>
+            </div>
+            <div class="relative">
+                <p class="text-blue-100 text-sm font-medium mb-1">Cumulative GPA</p>
+                <h2 class="text-4xl font-bold">{{ "%.2f"|format(overall_cgpa) }}</h2>
+            </div>
+        </div>
+        
+        <!-- Units Passed -->
+        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white relative overflow-hidden">
+            <div class="absolute top-0 right-0 opacity-10">
+                <i class="ri-check-double-line text-8xl"></i>
+            </div>
+            <div class="relative">
+                <p class="text-green-100 text-sm font-medium mb-1">Units Passed</p>
+                <h2 class="text-4xl font-bold">{{ total_units_passed }}</h2>
+            </div>
+        </div>
+        
+        <!-- Units Failed -->
+        <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white relative overflow-hidden">
+            <div class="absolute top-0 right-0 opacity-10">
+                <i class="ri-close-circle-line text-8xl"></i>
+            </div>
+            <div class="relative">
+                <p class="text-red-100 text-sm font-medium mb-1">Units Failed</p>
+                <h2 class="text-4xl font-bold">{{ total_units_failed }}</h2>
+            </div>
+        </div>
+        
+        <!-- Carryovers -->
+        <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white relative overflow-hidden">
+            <div class="absolute top-0 right-0 opacity-10">
+                <i class="ri-alarm-warning-line text-8xl"></i>
+            </div>
+            <div class="relative">
+                <p class="text-orange-100 text-sm font-medium mb-1">Carryovers</p>
+                <h2 class="text-4xl font-bold">{{ outstanding_carryovers|length }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Bar -->
+{% if total_units_registered > 0 %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+            <i class="ri-bar-chart-line text-blue-500 mr-2"></i>
+            Academic Progress
+        </h3>
+        <span class="text-sm text-gray-600">Total: <strong>{{ total_units_registered }}</strong> Units</span>
+    </div>
+    <div class="relative">
+        <div class="flex h-8 rounded-lg overflow-hidden bg-gray-200">
+            <div class="bg-green-500 flex items-center justify-center text-white text-xs font-medium" 
+                 style="width: {{ (total_units_passed / total_units_registered * 100)|round(1) }}%">
+                {{ (total_units_passed / total_units_registered * 100)|round(1) }}% Passed
+            </div>
+            {% if total_units_failed > 0 %}
+            <div class="bg-red-500 flex items-center justify-center text-white text-xs font-medium" 
+                 style="width: {{ (total_units_failed / total_units_registered * 100)|round(1) }}%">
+                {{ (total_units_failed / total_units_registered * 100)|round(1) }}% Failed
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Carryover Alert Section -->
+{% if outstanding_carryovers %}
+<div class="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-6 mb-6 shadow-sm">
+    <div class="flex items-start">
+        <div class="flex-shrink-0">
+            <i class="ri-error-warning-line text-yellow-600 text-3xl"></i>
+        </div>
+        <div class="ml-4 flex-1">
+            <h3 class="text-lg font-semibold text-yellow-900 mb-2">Outstanding Carryover Courses</h3>
+            <p class="text-yellow-800 mb-4">This student has <strong>{{ outstanding_carryovers|length }}</strong> outstanding carryover course(s) that must be cleared:</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {% for carryover in outstanding_carryovers %}
+                <div class="bg-white border border-yellow-200 rounded-lg p-3 flex items-start shadow-sm">
+                    <i class="ri-file-forbid-line text-red-500 mr-3 text-xl flex-shrink-0"></i>
+                    <div>
+                        <p class="font-bold text-gray-900">{{ carryover.course.course_code }}</p>
+                        <p class="text-sm text-gray-600">{{ carryover.course.course_title }} ({{ carryover.course.credit_unit }} CU)</p>
+                        <p class="text-xs text-red-600 mt-1">Failed in {{ carryover.original_session.session_name }} at {{ carryover.original_level }}L</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Academic History by Session -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
+    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+            <i class="ri-history-line text-blue-500 mr-2"></i>
+            Academic History
+        </h3>
+        <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+            {{ academic_history|length }} Session(s)
+        </span>
+    </div>
+    <div class="p-6">
+        {% if academic_history %}
+        <div class="space-y-4" x-data="{ openSession: '{{ academic_history[-1].session.id }}' }">
+            {% for history in academic_history|reverse %}
+            <div class="border border-gray-200 rounded-lg overflow-hidden">
+                <button @click="openSession = openSession === '{{ history.session.id }}' ? '' : '{{ history.session.id }}'"
+                        class="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors flex justify-between items-center">
+                    <div class="flex items-center space-x-3">
+                        <div>
+                            <span class="font-semibold text-gray-900">{{ history.session.session_name }}</span>
+                            <span class="ml-2 px-2 py-1 bg-gray-200 text-gray-800 rounded text-sm">{{ history.level }} Level</span>
+                            {% if history.is_current %}
+                            <span class="ml-1 px-2 py-1 bg-green-100 text-green-800 rounded text-sm font-medium">Current</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="px-2 py-1 {{ 'bg-green-100 text-green-800' if history.remarks == 'Good Standing' else ('bg-yellow-100 text-yellow-800' if history.remarks == 'Probation' else 'bg-red-100 text-red-800') }} rounded text-sm font-medium">
+                            {{ history.remarks }}
+                        </span>
+                        <span class="text-sm text-gray-600">GPA: <strong class="text-gray-900">{{ "%.2f"|format(history.session_gpa) }}</strong></span>
+                        <span class="text-sm text-gray-600">CGPA: <strong class="text-gray-900">{{ "%.2f"|format(history.cgpa) }}</strong></span>
+                        <i class="ri-arrow-down-s-line text-gray-400 transform transition-transform" 
+                           :class="openSession === '{{ history.session.id }}' && 'rotate-180'"></i>
+                    </div>
+                </button>
+                <div x-show="openSession === '{{ history.session.id }}'" 
+                     x-collapse
+                     class="bg-white">
+                    <div class="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <!-- First Semester -->
+                        <div class="border border-gray-200 rounded-lg overflow-hidden">
+                            <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                                <h4 class="font-semibold text-gray-900 flex items-center">
+                                    <i class="ri-number-1 mr-2 text-blue-500"></i>
+                                    First Semester
+                                </h4>
+                                <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm font-medium">
+                                    GPA: {{ "%.2f"|format(history.first_semester.gpa) }}
+                                </span>
+                            </div>
+                            <div class="p-0">
+                                {% if history.first_semester.results %}
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead class="bg-gray-100 text-gray-700">
+                                            <tr>
+                                                <th class="px-3 py-2 text-left font-medium">Course</th>
+                                                <th class="px-3 py-2 text-center font-medium">CU</th>
+                                                <th class="px-3 py-2 text-center font-medium">CA</th>
+                                                <th class="px-3 py-2 text-center font-medium">Exam</th>
+                                                <th class="px-3 py-2 text-center font-medium">Total</th>
+                                                <th class="px-3 py-2 text-center font-medium">Grade</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-200">
+                                            {% for result in history.first_semester.results %}
+                                            <tr class="hover:bg-gray-50 {{ 'bg-red-50' if result.grade == 'F' else '' }}">
+                                                <td class="px-3 py-2">
+                                                    <span class="font-semibold text-gray-900">{{ result.course.course_code }}</span>
+                                                    {% if result.is_carryover %}
+                                                    <span class="ml-1 px-1.5 py-0.5 bg-yellow-100 text-yellow-800 rounded text-xs font-medium">CO</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td class="px-3 py-2 text-center">{{ result.course.credit_unit }}</td>
+                                                <td class="px-3 py-2 text-center">{{ result.ca_score|int }}</td>
+                                                <td class="px-3 py-2 text-center">{{ result.exam_score|int }}</td>
+                                                <td class="px-3 py-2 text-center font-semibold">{{ result.total_score|int }}</td>
+                                                <td class="px-3 py-2 text-center">
+                                                    <span class="px-2 py-1 {{ 'bg-green-100 text-green-800' if result.grade != 'F' else 'bg-red-100 text-red-800' }} rounded text-xs font-bold">
+                                                        {{ result.grade }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="px-3 py-2 bg-gray-50 border-t border-gray-200">
+                                    <p class="text-xs text-gray-600">
+                                        <strong>Units:</strong> Passed: {{ history.first_semester.summary.passed }} | 
+                                        Failed: {{ history.first_semester.summary.failed }} | 
+                                        Total: {{ history.first_semester.summary.total }}
+                                    </p>
+                                </div>
+                                {% else %}
+                                <div class="p-6 text-center text-gray-500">
+                                    <i class="ri-inbox-line text-3xl mb-2"></i>
+                                    <p>No results recorded</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Second Semester -->
+                        <div class="border border-gray-200 rounded-lg overflow-hidden">
+                            <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                                <h4 class="font-semibold text-gray-900 flex items-center">
+                                    <i class="ri-number-2 mr-2 text-blue-500"></i>
+                                    Second Semester
+                                </h4>
+                                <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm font-medium">
+                                    GPA: {{ "%.2f"|format(history.second_semester.gpa) }}
+                                </span>
+                            </div>
+                            <div class="p-0">
+                                {% if history.second_semester.results %}
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead class="bg-gray-100 text-gray-700">
+                                            <tr>
+                                                <th class="px-3 py-2 text-left font-medium">Course</th>
+                                                <th class="px-3 py-2 text-center font-medium">CU</th>
+                                                <th class="px-3 py-2 text-center font-medium">CA</th>
+                                                <th class="px-3 py-2 text-center font-medium">Exam</th>
+                                                <th class="px-3 py-2 text-center font-medium">Total</th>
+                                                <th class="px-3 py-2 text-center font-medium">Grade</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-200">
+                                            {% for result in history.second_semester.results %}
+                                            <tr class="hover:bg-gray-50 {{ 'bg-red-50' if result.grade == 'F' else '' }}">
+                                                <td class="px-3 py-2">
+                                                    <span class="font-semibold text-gray-900">{{ result.course.course_code }}</span>
+                                                    {% if result.is_carryover %}
+                                                    <span class="ml-1 px-1.5 py-0.5 bg-yellow-100 text-yellow-800 rounded text-xs font-medium">CO</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td class="px-3 py-2 text-center">{{ result.course.credit_unit }}</td>
+                                                <td class="px-3 py-2 text-center">{{ result.ca_score|int }}</td>
+                                                <td class="px-3 py-2 text-center">{{ result.exam_score|int }}</td>
+                                                <td class="px-3 py-2 text-center font-semibold">{{ result.total_score|int }}</td>
+                                                <td class="px-3 py-2 text-center">
+                                                    <span class="px-2 py-1 {{ 'bg-green-100 text-green-800' if result.grade != 'F' else 'bg-red-100 text-red-800' }} rounded text-xs font-bold">
+                                                        {{ result.grade }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="px-3 py-2 bg-gray-50 border-t border-gray-200">
+                                    <p class="text-xs text-gray-600">
+                                        <strong>Units:</strong> Passed: {{ history.second_semester.summary.passed }} | 
+                                        Failed: {{ history.second_semester.summary.failed }} | 
+                                        Total: {{ history.second_semester.summary.total }}
+                                    </p>
+                                </div>
+                                {% else %}
+                                <div class="p-6 text-center text-gray-500">
+                                    <i class="ri-inbox-line text-3xl mb-2"></i>
+                                    <p>No results recorded</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Session Summary and Failed Courses Alert -->
+                    <div class="mt-4 space-y-4">
+                        {% if history.failed_courses %}
+                        <div class="bg-red-50 border-l-4 border-red-400 rounded-lg p-4 flex items-start">
+                            <i class="ri-error-warning-line text-red-600 text-2xl mr-3 flex-shrink-0"></i>
+                            <div>
+                                <p class="font-semibold text-red-900">Failed Courses ({{ history.failed_courses|length }})</p>
+                                <p class="text-sm text-red-700 mt-1">
+                                    {% for result in history.failed_courses %}
+                                    <span class="font-medium">{{ result.course.course_code }}</span>{% if not loop.last %}, {% endif %}
+                                    {% endfor %}
+                                    - These will be carried over to the next session.
+                                </p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Session Summary -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="bg-gray-50 rounded-lg p-4 text-center">
+                                <p class="text-xs text-gray-600 mb-1">Total Units</p>
+                                <p class="text-2xl font-bold text-gray-900">{{ history.session_summary.total }}</p>
+                            </div>
+                            <div class="bg-green-50 rounded-lg p-4 text-center">
+                                <p class="text-xs text-green-600 mb-1">Units Passed</p>
+                                <p class="text-2xl font-bold text-green-700">{{ history.session_summary.passed }}</p>
+                            </div>
+                            <div class="bg-red-50 rounded-lg p-4 text-center">
+                                <p class="text-xs text-red-600 mb-1">Units Failed</p>
+                                <p class="text-2xl font-bold text-red-700">{{ history.session_summary.failed }}</p>
+                            </div>
+                            <div class="bg-blue-50 rounded-lg p-4 text-center">
+                                <p class="text-xs text-blue-600 mb-1">Session GPA</p>
+                                <p class="text-2xl font-bold text-blue-700">{{ "%.2f"|format(history.session_gpa) }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="text-center py-12 text-gray-500">
+            <i class="ri-file-list-line text-6xl mb-4"></i>
+            <h5 class="text-xl font-semibold text-gray-700 mb-2">No Academic History</h5>
+            <p>No results have been uploaded for this student yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Carryover Tracking Section -->
+{% if carryovers %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
+    <div class="px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+            <i class="ri-refresh-line text-blue-500 mr-2"></i>
+            Carryover Tracking
+        </h3>
+    </div>
+    <div class="p-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Outstanding Carryovers -->
+            <div>
+                <h4 class="text-lg font-semibold text-red-600 mb-4 flex items-center">
+                    <i class="ri-close-circle-line mr-2"></i>
+                    Outstanding ({{ outstanding_carryovers|length }})
+                </h4>
+                {% if outstanding_carryovers %}
+                <div class="space-y-3">
+                    {% for carryover in outstanding_carryovers %}
+                    <div class="border border-red-200 rounded-lg p-4 bg-red-50 hover:shadow-md transition-shadow">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <p class="font-bold text-gray-900">{{ carryover.course.course_code }} <span class="text-gray-600 font-normal">({{ carryover.course.credit_unit }} CU)</span></p>
+                                <p class="text-sm text-gray-700 mt-1">{{ carryover.course.course_title }}</p>
+                                <p class="text-xs text-red-600 mt-2">
+                                    Failed: {{ carryover.original_session.session_name }} at {{ carryover.original_level }}L
+                                </p>
+                            </div>
+                            <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-bold">Pending</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center">
+                    <i class="ri-check-circle-line text-green-600 mr-3 text-2xl"></i>
+                    <span class="text-green-800 font-medium">No outstanding carryovers!</span>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Cleared Carryovers -->
+            <div>
+                <h4 class="text-lg font-semibold text-green-600 mb-4 flex items-center">
+                    <i class="ri-checkbox-circle-line mr-2"></i>
+                    Cleared ({{ cleared_carryovers|length }})
+                </h4>
+                {% if cleared_carryovers %}
+                <div class="space-y-3">
+                    {% for carryover in cleared_carryovers %}
+                    <div class="border border-green-200 rounded-lg p-4 bg-green-50 hover:shadow-md transition-shadow">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <p class="font-bold text-gray-900">{{ carryover.course.course_code }} <span class="text-gray-600 font-normal">({{ carryover.course.credit_unit }} CU)</span></p>
+                                <p class="text-sm text-gray-700 mt-1">{{ carryover.course.course_title }}</p>
+                                <p class="text-xs text-green-600 mt-2">
+                                    Cleared: {{ carryover.cleared_session.session_name if carryover.cleared_session else 'N/A' }}
+                                    {% if carryover.cleared_result %}
+                                    (Score: {{ carryover.cleared_result.total_score|int }}, Grade: {{ carryover.cleared_result.grade }})
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-bold">Cleared</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-gray-500 text-sm">No cleared carryovers yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Quick Actions -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
+    <div class="px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+            <i class="ri-flashlight-line text-blue-500 mr-2"></i>
+            Quick Actions
+        </h3>
+    </div>
+    <div class="p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <a href="{{ url_for('reports.student_result', student_id=student.id) }}" class="group border border-gray-200 rounded-lg p-4 hover:border-red-500 hover:shadow-lg transition-all duration-200 flex items-start">
+                <i class="ri-file-pdf-line text-red-500 text-3xl mr-3 flex-shrink-0"></i>
+                <div>
+                    <p class="font-semibold text-gray-900 group-hover:text-red-600 transition-colors">Generate Result PDF</p>
+                    <p class="text-sm text-gray-500 mt-1">Download official result</p>
+                </div>
+            </a>
+            <a href="{{ url_for('students.edit', student_id=student.id) }}" class="group border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:shadow-lg transition-all duration-200 flex items-start">
+                <i class="ri-pencil-line text-blue-500 text-3xl mr-3 flex-shrink-0"></i>
+                <div>
+                    <p class="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">Edit Profile</p>
+                    <p class="text-sm text-gray-500 mt-1">Update student info</p>
+                </div>
+            </a>
+            <a href="{{ url_for('results.index') }}" class="group border border-gray-200 rounded-lg p-4 hover:border-green-500 hover:shadow-lg transition-all duration-200 flex items-start">
+                <i class="ri-bar-chart-box-line text-green-500 text-3xl mr-3 flex-shrink-0"></i>
+                <div>
+                    <p class="font-semibold text-gray-900 group-hover:text-green-600 transition-colors">View Results</p>
+                    <p class="text-sm text-gray-500 mt-1">All course results</p>
+                </div>
+            </a>
+            <a href="{{ url_for('students.index') }}" class="group border border-gray-200 rounded-lg p-4 hover:border-purple-500 hover:shadow-lg transition-all duration-200 flex items-start">
+                <i class="ri-group-line text-purple-500 text-3xl mr-3 flex-shrink-0"></i>
+                <div>
+                    <p class="font-semibold text-gray-900 group-hover:text-purple-600 transition-colors">All Students</p>
+                    <p class="text-sm text-gray-500 mt-1">Back to student list</p>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

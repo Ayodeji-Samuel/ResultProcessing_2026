@@ -1,0 +1,10 @@
+IMPORTANT: Save the EDSU University Logo
+
+The university logo image has been uploaded but needs to be manually saved.
+
+Steps:
+1. Save the uploaded EDSU logo image (the circular blue badge with "EDO STATE UNIVERSITY IYAMHO")
+2. Save it as: app\static\logos\university_logo.png
+3. The logo will automatically appear in the sidebar and reports
+
+Current status: Placeholder created, awaiting actual logo file

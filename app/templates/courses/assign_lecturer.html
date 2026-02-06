@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Assign Lecturer - {{ course.course_code }} - Result Processing System{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-lg p-6 mb-6">
+    <div class="flex justify-between items-center">
+        <div class="text-white">
+            <div class="flex items-center mb-2">
+                <i class="ri-user-add-line text-3xl mr-3"></i>
+                <h1 class="text-2xl font-bold">Assign Lecturer to Course</h1>
+            </div>
+            <p class="text-blue-100">{{ course.course_code }} - {{ course.course_title }}</p>
+        </div>
+        <a href="{{ url_for('courses.index') }}" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors flex items-center font-medium">
+            <i class="ri-arrow-left-line mr-2"></i> Back to Courses
+        </a>
+    </div>
+</div>
+
+<!-- Assign Form -->
+<div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+    <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
+        <i class="ri-user-line mr-2 text-blue-600"></i> Assign New Lecturer
+    </h2>
+    
+    <form method="POST" class="space-y-4">
+        <div>
+            <label for="lecturer_id" class="block text-sm font-semibold text-gray-700 mb-2">
+                Select Lecturer <span class="text-red-500">*</span>
+            </label>
+            <select name="lecturer_id" id="lecturer_id" required
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <option value="">-- Select a Lecturer --</option>
+                {% for lecturer in lecturers %}
+                    {% if lecturer.id not in assigned_ids %}
+                    <option value="{{ lecturer.id }}">
+                        {{ lecturer.full_name }} ({{ lecturer.username }}) - {{ lecturer.role|upper }}
+                    </option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="flex justify-end gap-3">
+            <a href="{{ url_for('courses.view_course_assignments', course_id=course.id) }}" 
+               class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium">
+                Cancel
+            </a>
+            <button type="submit" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-bold flex items-center">
+                <i class="ri-user-add-line mr-2"></i> Assign Lecturer
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Current Assignments -->
+<div class="bg-white rounded-xl shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+        <h2 class="text-lg font-bold text-gray-900 flex items-center">
+            <i class="ri-team-line mr-2 text-blue-600"></i> Currently Assigned Lecturers
+        </h2>
+    </div>
+    
+    <div class="p-6">
+        {% if assignments %}
+        <div class="overflow-x-auto rounded-lg border border-gray-200">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gradient-to-r from-gray-800 to-gray-900">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Lecturer Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Email</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Role</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Assigned On</th>
+                        <th class="px-6 py-3 text-center text-xs font-bold text-white uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for assignment in assignments %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <i class="ri-user-line text-blue-600 text-xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-bold text-gray-900">{{ assignment.lecturer.full_name }}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-700">{{ assignment.lecturer.email }}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-bold uppercase">
+                                {{ assignment.lecturer.role }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-700">
+                            {{ assignment.assigned_at.strftime('%B %d, %Y') }}
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <form method="POST" action="{{ url_for('courses.remove_assignment', assignment_id=assignment.id) }}" 
+                                  class="inline" onsubmit="return confirm('Are you sure you want to remove this assignment?');">
+                                <button type="submit" class="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium">
+                                    <i class="ri-user-unfollow-line"></i> Remove
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <i class="ri-team-line text-6xl text-gray-300 mb-3"></i>
+            <p class="text-gray-500 font-medium">No lecturers assigned to this course yet</p>
+            <p class="text-gray-400 text-sm mt-1">Use the form above to assign lecturers</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

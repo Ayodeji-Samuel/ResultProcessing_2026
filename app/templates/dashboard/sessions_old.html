@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Academic Sessions - Result Processing System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Academic Sessions</h1>
+        <p class="text-muted">Manage academic sessions/years</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">All Sessions</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Session</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for session in sessions %}
+                            <tr>
+                                <td><strong>{{ session.session_name }}</strong></td>
+                                <td>
+                                    {% if session.is_current %}
+                                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Current</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ session.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    {% if not session.is_current %}
+                                    <form action="{{ url_for('dashboard.set_current_session', session_id=session.id) }}" 
+                                          method="POST" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Set as Current">
+                                            <i class="bi bi-check-lg"></i> Set Current
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    
+                                    {% if current_user.role == 'admin' %}
+                                    <form action="{{ url_for('dashboard.delete_session', session_id=session.id) }}" 
+                                          method="POST" class="d-inline"
+                                          onsubmit="return confirm('Delete this session? This cannot be undone.');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">No sessions found. Create one to begin.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Create Session</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('dashboard.create_session') }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <div class="mb-3">
+                        <label for="session_name" class="form-label">Session Name</label>
+                        <input type="text" class="form-control" id="session_name" name="session_name" 
+                               placeholder="e.g., 2025/2026" required pattern="\d{4}/\d{4}">
+                        <div class="form-text">Format: YYYY/YYYY (e.g., 2025/2026)</div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-plus"></i> Create Session
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-3 bg-light">
+            <div class="card-body">
+                <h6><i class="bi bi-info-circle"></i> About Sessions</h6>
+                <p class="small mb-0">
+                    Academic sessions organize your data by year. Only one session can be 
+                    "current" at a time. All new students and results will be linked to the 
+                    current session.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

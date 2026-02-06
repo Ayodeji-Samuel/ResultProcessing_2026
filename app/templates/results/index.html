@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}Results - Result Processing System{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="mb-8">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Results</h1>
+            <p class="text-gray-600">
+                Manage student results
+                {% if current_session %}
+                <span class="ml-2 px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium">
+                    {{ current_session.session_name }}
+                </span>
+                {% endif %}
+            </p>
+        </div>
+        <div class="flex space-x-3">
+            <a href="{{ url_for('results.upload') }}" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center">
+                <i class="ri-upload-cloud-line mr-2"></i>
+                Upload Results
+            </a>
+            <a href="{{ url_for('courses.index') }}" class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center">
+                <i class="ri-file-add-line mr-2"></i>
+                Manual Entry
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+    <form method="GET" class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Matric Number</label>
+            <input type="text" name="matric" value="{{ request.args.get('matric', '') }}" 
+                   placeholder="Enter matric number..." 
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Course Code</label>
+            <input type="text" name="course" value="{{ request.args.get('course', '') }}" 
+                   placeholder="Enter course code..." 
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Level</label>
+            <select name="level" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                <option value="">All Levels</option>
+                {% for level in levels %}
+                <option value="{{ level }}" {{ 'selected' if request.args.get('level')|string == level|string }}>{{ level }} Level</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Semester</label>
+            <select name="semester" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                <option value="">All Semesters</option>
+                {% for semester_id, semester_name in semesters %}
+                <option value="{{ semester_id }}" {{ 'selected' if request.args.get('semester')|string == semester_id|string }}>{{ semester_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="flex items-end">
+            <button type="submit" class="w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
+                <i class="ri-search-line mr-2"></i>Filter
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-blue-100 text-sm font-medium mb-1">Total Results</p>
+                <h3 class="text-3xl font-bold">{{ results.total }}</h3>
+            </div>
+            <div class="bg-white bg-opacity-20 rounded-full p-4">
+                <i class="ri-file-list-line text-3xl"></i>
+            </div>
+        </div>
+    </div>
+    <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-green-100 text-sm font-medium mb-1">Passed</p>
+                <h3 class="text-3xl font-bold">{{ stats.passed if stats else 0 }}</h3>
+            </div>
+            <div class="bg-white bg-opacity-20 rounded-full p-4">
+                <i class="ri-checkbox-circle-line text-3xl"></i>
+            </div>
+        </div>
+    </div>
+    <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-lg">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-red-100 text-sm font-medium mb-1">Failed</p>
+                <h3 class="text-3xl font-bold">{{ stats.failed if stats else 0 }}</h3>
+            </div>
+            <div class="bg-white bg-opacity-20 rounded-full p-4">
+                <i class="ri-close-circle-line text-3xl"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results Table -->
+<div class="bg-white rounded-xl shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Matric No.</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Student Name</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Course Code</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Course Title</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Score</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Grade</th>
+                    <th class="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for result in results.items %}
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4">
+                        <span class="font-mono text-sm font-semibold text-gray-900">{{ result.student.matric_number }}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <p class="text-sm font-medium text-gray-900">{{ result.student.full_name }}</p>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="font-mono text-sm font-semibold text-gray-900">{{ result.course.course_code }}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <p class="text-sm text-gray-900">{{ result.course.course_title }}</p>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="font-bold text-gray-900">{{ result.total_score }}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if result.grade in ['A', 'B'] %}
+                        <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-bold">{{ result.grade }}</span>
+                        {% elif result.grade in ['C', 'D'] %}
+                        <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-bold">{{ result.grade }}</span>
+                        {% else %}
+                        <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-bold">{{ result.grade }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        {% if result.course.is_approved %}
+                        <span class="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-bold">
+                            <i class="ri-shield-check-fill mr-1"></i> Final Approved
+                        </span>
+                        {% elif result.is_locked %}
+                        <span class="inline-flex items-center px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-bold">
+                            <i class="ri-lock-fill mr-1"></i> Locked
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-bold">
+                            <i class="ri-draft-line mr-1"></i> Draft
+                        </span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="px-6 py-12 text-center">
+                        <div class="flex flex-col items-center">
+                            <i class="ri-file-search-line text-6xl text-gray-300 mb-4"></i>
+                            <p class="text-gray-500 font-medium">No results found</p>
+                            <p class="text-gray-400 text-sm mt-1">Try adjusting your filters or add new results</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Pagination -->
+    {% if results.pages > 1 %}
+    <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+        <div class="text-sm text-gray-600">
+            Showing {{ ((results.page - 1) * results.per_page) + 1 }} to {{ results.page * results.per_page if results.page * results.per_page < results.total else results.total }} of {{ results.total }} results
+        </div>
+        <div class="flex space-x-2">
+            {% if results.has_prev %}
+            <a href="{{ url_for('results.index', page=results.prev_num, **request.args) }}" 
+               class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors text-sm font-medium">
+                <i class="ri-arrow-left-line mr-1"></i>Previous
+            </a>
+            {% endif %}
+            {% for page_num in results.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if page_num %}
+                <a href="{{ url_for('results.index', page=page_num, **request.args) }}" 
+                   class="px-4 py-2 {{ 'bg-primary-600 text-white' if page_num == results.page else 'border border-gray-300 hover:bg-gray-100' }} rounded-lg transition-colors text-sm font-medium">
+                    {{ page_num }}
+                </a>
+                {% else %}
+                <span class="px-4 py-2">...</span>
+                {% endif %}
+            {% endfor %}
+            {% if results.has_next %}
+            <a href="{{ url_for('results.index', page=results.next_num, **request.args) }}" 
+               class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors text-sm font-medium">
+                Next<i class="ri-arrow-right-line ml-1"></i>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
