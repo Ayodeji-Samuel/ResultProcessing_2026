@@ -58,6 +58,8 @@ def parse_student_csv(file_content):
                 column_map['first_name'] = field
             elif 'other' in field_lower or 'middle' in field_lower:
                 column_map['other_names'] = field
+            elif 'gender' in field_lower or 'sex' in field_lower:
+                column_map['gender'] = field
         
         # Validate required columns
         required = ['matric_number', 'surname', 'first_name']
@@ -71,6 +73,7 @@ def parse_student_csv(file_content):
                 surname = row.get(column_map['surname'], '').strip()
                 first_name = row.get(column_map['first_name'], '').strip()
                 other_names = row.get(column_map.get('other_names', ''), '').strip() if 'other_names' in column_map else ''
+                gender = row.get(column_map.get('gender', ''), '').strip().upper() if 'gender' in column_map else ''
                 
                 if not matric:
                     errors.append(f'Row {row_num}: Missing matric number')
@@ -86,7 +89,8 @@ def parse_student_csv(file_content):
                     'matric_number': matric.upper(),
                     'surname': surname.upper(),
                     'first_name': first_name.title(),
-                    'other_names': other_names.title() if other_names else None
+                    'other_names': other_names.title() if other_names else None,
+                    'gender': gender if gender in ['M', 'F'] else None
                 })
             except Exception as e:
                 errors.append(f'Row {row_num}: {str(e)}')
@@ -193,10 +197,10 @@ def generate_sample_student_csv():
     Returns:
         str: Sample CSV content
     """
-    content = "Matric Number,Surname,First Name,Other Names\n"
-    content += "CSC/2023/001,ADEYEMI,John,Oluwaseun\n"
-    content += "CSC/2023/002,OKONKWO,Mary,Chidinma\n"
-    content += "CSC/2023/003,IBRAHIM,Ahmed,Musa\n"
+    content = "Matric Number,Surname,First Name,Other Names,Gender\n"
+    content += "CSC/2023/001,ADEYEMI,John,Oluwaseun,M\n"
+    content += "CSC/2023/002,OKONKWO,Mary,Chidinma,F\n"
+    content += "CSC/2023/003,IBRAHIM,Ahmed,Musa,M\n"
     return content
 
 

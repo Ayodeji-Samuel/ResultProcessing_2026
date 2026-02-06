@@ -115,7 +115,7 @@ def create_header_styles():
     return styles
 
 
-def generate_spreadsheet_pdf(data, config, signatories=None):
+def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10):
     """
     Generate the examination record spreadsheet PDF.
     
@@ -132,10 +132,13 @@ def generate_spreadsheet_pdf(data, config, signatories=None):
             - course_adviser: Name of course adviser
             - hod: Name of HOD
             - dean: Name of Dean
+        font_size: Base font size for data rows (minimum 10, default 10)
     
     Returns:
         BytesIO: PDF file buffer
     """
+    # Ensure font size is at least 10
+    font_size = max(10, font_size)
     buffer = BytesIO()
     
     # Use landscape orientation for wide spreadsheets
@@ -213,54 +216,130 @@ def generate_spreadsheet_pdf(data, config, signatories=None):
     if semester_type == '1':
         courses_to_show = first_sem_courses
         semester_label = 'FIRST SEMESTER'
+        show_combined = False
     elif semester_type == '2':
         courses_to_show = second_sem_courses
         semester_label = 'SECOND SEMESTER'
+        show_combined = False
     else:
-        courses_to_show = first_sem_courses + second_sem_courses
+        # For 'both', we show both semesters separately
+        courses_to_show = []  # Not used in combined mode
         semester_label = 'BOTH SEMESTERS'
+        show_combined = True
     
-    # Calculate column counts
+    # Calculate column counts based on semester type
     base_cols = 3  # S/N, Matric, Name
-    course_cols = len(courses_to_show)
-    summary_cols = 4  # CUP, CUF, TCU, GPA
-    total_cols = base_cols + course_cols + summary_cols + 1  # +1 for Remarks
     
-    # Build table header rows (4 rows: semester label, course names, course status, credit units)
-    # Row 1: Headers for fixed columns and semester label
-    row1 = ['S/N', 'Matric Number', 'Student Name\n(Surname First)']  # Fixed column headers (will be spanned vertically)
-    row1.append(semester_label)  # This will span all course + summary columns
-    row1.append('Remarks')  # Remarks (will be spanned vertically)
+    if show_combined:
+        # Combined format: First Sem Courses + First Sem Summary + Second Sem Courses + Second Sem Summary + Session Summary + Remarks
+        first_sem_course_cols = len(first_sem_courses)
+        first_sem_summary_cols = 4  # CUF, CUP, TCU, GPA
+        second_sem_course_cols = len(second_sem_courses)
+        second_sem_summary_cols = 4  # CUF, CUP, TCU, GPA
+        session_summary_cols = 4  # CUF Session, CUP Session, TCU Session, CGPA
+        total_cols = base_cols + first_sem_course_cols + first_sem_summary_cols + second_sem_course_cols + second_sem_summary_cols + session_summary_cols + 1  # +1 for Remarks
+    else:
+        # Single semester format
+        course_cols = len(courses_to_show)
+        summary_cols = 4  # CUF, CUP, TCU, GPA
+        total_cols = base_cols + course_cols + summary_cols + 1  # +1 for Remarks
     
-    # Row 2: Course codes and titles (simulating vertical text with newlines)
-    row2 = ['', '', '']  # S/N, Matric, Name columns
-    row3 = ['', '', '']  # Course status row
-    row4 = ['', '', '']  # Credit units row
+    # Build table header rows (4 rows)
+    # Row 1: Semester labels
+    row1 = ['S/N', 'Matric Number', 'Student Name\n(Surname First)']
     
-    # Add courses to headers
+    # Row 2: Course codes and titles
+    row2 = ['', '', '']
+    
+    # Row 3: Course status row
+    row3 = ['', '', '']
+    
+    # Row 4: Credit units row
+    row4 = ['', '', '']
+    
     max_course_text_length = 0  # Track longest course text for header height
-    for course in courses_to_show:
-        # Course code and title - use VerticalText for proper rotation
-        course_text = f"{course['code']}: {course['title'][:20]}"
-        # Calculate length for height determination
-        text_length = stringWidth(course_text, 'Helvetica-Bold', 8)
-        max_course_text_length = max(max_course_text_length, text_length)
+    
+    if show_combined:
+        # FIRST SEMESTER SECTION
+        row1.append('FIRST SEMESTER')  # This will span first semester courses + summary
         
-        row2.append(VerticalText(course_text))
-        row3.append(course['status'])  # Course status (C, R, or E)
-        row4.append(str(course['credit_unit']))  # Credit unit for each course
-    
-    # Add summary column headers - make them vertical too
-    summary_labels = ['Credit Unit Passed', 'Credit Unit Failed', 'Total Credit Unit', 'GPA']
-    for label in summary_labels:
-        row2.append(VerticalText(label))
-    row3.extend(['', '', '', ''])  # No status for summary columns
-    row4.extend(['', '', '', ''])  # No credit units for summary columns
-    
-    # Add Remarks column - empty in rows 2, 3, 4 since row 1 has the header
-    row2.append('')
-    row3.append('')
-    row4.append('')
+        # Add first semester courses to rows 2, 3, 4
+        for course in first_sem_courses:
+            course_text = f"{course['code']}: {course['title'][:20]}"
+            text_length = stringWidth(course_text, 'Helvetica-Bold', 8)
+            max_course_text_length = max(max_course_text_length, text_length)
+            
+            row2.append(VerticalText(course_text))
+            row3.append(course['status'])
+            row4.append(str(course['credit_unit']))
+        
+        # Add first semester summary columns
+        first_sem_summary_labels = ['Total Credit Unit Failed', 'Total Credit Unit Passed', 'Total Credit Unit', 'GPA']
+        for label in first_sem_summary_labels:
+            row2.append(VerticalText(label))
+        row3.extend(['', '', '', ''])
+        row4.extend(['', '', '', ''])
+        
+        # SECOND SEMESTER SECTION
+        row1.append('SECOND SEMESTER')  # This will span second semester courses + summary
+        
+        # Add second semester courses to rows 2, 3, 4
+        for course in second_sem_courses:
+            course_text = f"{course['code']}: {course['title'][:20]}"
+            text_length = stringWidth(course_text, 'Helvetica-Bold', 8)
+            max_course_text_length = max(max_course_text_length, text_length)
+            
+            row2.append(VerticalText(course_text))
+            row3.append(course['status'])
+            row4.append(str(course['credit_unit']))
+        
+        # Add second semester summary columns
+        second_sem_summary_labels = ['Total Credit Unit Failed', 'Total Credit Unit Passed', 'Total Credit Unit', 'GPA']
+        for label in second_sem_summary_labels:
+            row2.append(VerticalText(label))
+        row3.extend(['', '', '', ''])
+        row4.extend(['', '', '', ''])
+        
+        # SESSION SUMMARY SECTION (not spanned in row1, individual columns)
+        session_summary_labels = ['Total Credit Unit Failed Session', 'Total Credit Unit Passed Session', 'Total Credit Unit Session', 'CGPA']
+        for label in session_summary_labels:
+            row1.append('')  # No spanning for session summary in row1
+            row2.append(VerticalText(label))
+        row3.extend(['', '', '', ''])
+        row4.extend(['', '', '', ''])
+        
+        # REMARKS
+        row1.append('Remarks')
+        row2.append('')
+        row3.append('')
+        row4.append('')
+        
+    else:
+        # Single semester format
+        row1.append(semester_label)  # This will span all course + summary columns
+        row1.append('Remarks')
+        
+        # Add courses to headers
+        for course in courses_to_show:
+            course_text = f"{course['code']}: {course['title'][:20]}"
+            text_length = stringWidth(course_text, 'Helvetica-Bold', 8)
+            max_course_text_length = max(max_course_text_length, text_length)
+            
+            row2.append(VerticalText(course_text))
+            row3.append(course['status'])
+            row4.append(str(course['credit_unit']))
+        
+        # Add summary column headers
+        summary_labels = ['Total Credit Unit Failed', 'Total Credit Unit Passed', 'Total Credit Unit', 'GPA']
+        for label in summary_labels:
+            row2.append(VerticalText(label))
+        row3.extend(['', '', '', ''])
+        row4.extend(['', '', '', ''])
+        
+        # Add Remarks column
+        row2.append('')
+        row3.append('')
+        row4.append('')
     
     table_data = [row1, row2, row3, row4]
     
@@ -269,7 +348,7 @@ def generate_spreadsheet_pdf(data, config, signatories=None):
         # Format student name with (Miss) prefix for females
         student_name = student['name']
         if student.get('gender') == 'F':
-            student_name = f"(Miss) {student_name}"
+            student_name = f"{student_name} (Miss)"
         
         row = [
             str(idx),
@@ -277,30 +356,68 @@ def generate_spreadsheet_pdf(data, config, signatories=None):
             student_name
         ]
         
-        # Get appropriate semester data
-        if semester_type == '1':
-            semester_data = student.get('first_semester', {})
-            summary = student.get('first_semester_summary', {})
-        elif semester_type == '2':
-            semester_data = student.get('second_semester', {})
-            summary = student.get('second_semester_summary', {})
+        if show_combined:
+            # COMBINED FORMAT: Show first semester, then second semester, then session summary
+            
+            # First semester courses
+            first_sem_data = student.get('first_semester', {})
+            for course in first_sem_courses:
+                course_result = first_sem_data.get(course['code'], '-')
+                row.append(course_result)
+            
+            # First semester summary
+            first_sem_summary = student.get('first_semester_summary', {})
+            row.append(str(first_sem_summary.get('failed_units', 0)))  # CUF
+            row.append(str(first_sem_summary.get('passed_units', 0)))  # CUP
+            row.append(str(first_sem_summary.get('total_units', 0)))   # TCU
+            row.append(f"{first_sem_summary.get('gpa', 0.00):.2f}")    # GPA
+            
+            # Second semester courses
+            second_sem_data = student.get('second_semester', {})
+            for course in second_sem_courses:
+                course_result = second_sem_data.get(course['code'], '-')
+                row.append(course_result)
+            
+            # Second semester summary
+            second_sem_summary = student.get('second_semester_summary', {})
+            row.append(str(second_sem_summary.get('failed_units', 0)))  # CUF
+            row.append(str(second_sem_summary.get('passed_units', 0)))  # CUP
+            row.append(str(second_sem_summary.get('total_units', 0)))   # TCU
+            row.append(f"{second_sem_summary.get('gpa', 0.00):.2f}")    # GPA
+            
+            # Session summary (combined first + second semester)
+            session_summary = student.get('session_summary', {})
+            row.append(str(session_summary.get('failed_units', 0)))  # CUF Session
+            row.append(str(session_summary.get('passed_units', 0)))  # CUP Session
+            row.append(str(session_summary.get('total_units', 0)))   # TCU Session
+            row.append(f"{session_summary.get('cgpa', 0.00):.2f}")   # CGPA
+            
         else:
-            # For both semesters, combine data (this is simplified)
-            semester_data = {**student.get('first_semester', {}), **student.get('second_semester', {})}
-            summary = student.get('first_semester_summary', {})  # Use first semester summary for now
+            # SINGLE SEMESTER FORMAT
+            # Get appropriate semester data
+            if semester_type == '1':
+                semester_data = student.get('first_semester', {})
+                summary = student.get('first_semester_summary', {})
+            elif semester_type == '2':
+                semester_data = student.get('second_semester', {})
+                summary = student.get('second_semester_summary', {})
+            else:
+                # Fallback (should not happen with new logic)
+                semester_data = {**student.get('first_semester', {}), **student.get('second_semester', {})}
+                summary = student.get('first_semester_summary', {})
+            
+            # Course scores
+            for course in courses_to_show:
+                course_result = semester_data.get(course['code'], '-')
+                row.append(course_result)
+            
+            # Summary columns
+            row.append(str(summary.get('failed_units', 0)))  # CUF
+            row.append(str(summary.get('passed_units', 0)))  # CUP
+            row.append(str(summary.get('total_units', 0)))   # TCU
+            row.append(f"{summary.get('gpa', 0.00):.2f}")    # GPA
         
-        # Course scores
-        for course in courses_to_show:
-            course_result = semester_data.get(course['code'], '-')
-            row.append(course_result)
-        
-        # Summary columns
-        row.append(str(summary.get('passed_units', 0)))  # CUP
-        row.append(str(summary.get('failed_units', 0)))  # CUF
-        row.append(str(summary.get('total_units', 0)))   # TCU
-        row.append(f"{summary.get('gpa', 0.00):.2f}")    # GPA
-        
-        # Remarks - use carryover data if available
+        # Remarks - use carryover data if available (common for both formats)
         remark = student.get('remark', 'Proceed')
         row.append(remark)
         
@@ -308,7 +425,7 @@ def generate_spreadsheet_pdf(data, config, signatories=None):
     
     # Calculate dynamic column widths based on content
     col_widths = []
-    padding = 0.3*cm  # Extra padding for each column
+    padding = 0.2*cm  # Reduced padding for better space utilization
     
     # Calculate width for each column
     for col_idx in range(total_cols):
@@ -321,45 +438,64 @@ def generate_spreadsheet_pdf(data, config, signatories=None):
                 
                 # Handle VerticalText objects
                 if isinstance(cell_content, VerticalText):
-                    # For vertical text, width is just the font size + padding
-                    cell_width = cell_content.fontSize + padding
+                    # For vertical text, width is just the font size + minimal padding
+                    cell_width = cell_content.fontSize + 0.15*cm
                 else:
                     # For regular text, calculate based on string width
                     text = str(cell_content)
                     # Use appropriate font size based on row
                     if row_idx <= 3:  # Header rows
-                        font_size = 8
-                    else:  # Data rows
-                        font_size = 9
+                        cell_font_size = 8
+                    else:  # Data rows - use the configurable font size
+                        cell_font_size = font_size
                     
                     # Calculate width for multi-line text (take max line width)
                     lines = text.split('\n')
-                    max_line_width = max([stringWidth(line, 'Helvetica-Bold' if row_idx <= 3 else 'Helvetica', font_size) for line in lines] or [0])
+                    max_line_width = max([stringWidth(line, 'Helvetica-Bold' if row_idx <= 3 else 'Helvetica', cell_font_size) for line in lines] or [0])
                     cell_width = max_line_width + padding
                 
                 max_width = max(max_width, cell_width)
         
         # Set minimum widths for specific columns
         if col_idx == 0:  # S/N
-            max_width = max(max_width, 0.8*cm)
+            max_width = max(max_width, 0.7*cm)
         elif col_idx == 1:  # Matric
-            max_width = max(max_width, 2.5*cm)
+            max_width = max(max_width, 2.2*cm)
         elif col_idx == 2:  # Name
-            max_width = max(max_width, 4*cm)
+            max_width = max(max_width, 3.5*cm)
         elif col_idx == total_cols - 1:  # Remarks
-            max_width = max(max_width, 1.5*cm)
-        else:  # Course and summary columns
-            max_width = max(max_width, 1.2*cm)
+            max_width = max(max_width, 1.3*cm)
+        else:  # Course and summary columns - use content-based width
+            max_width = max(max_width, 0.6*cm)  # Minimum width for course columns
         
         col_widths.append(max_width)
     
     # Adjust if total width exceeds page width
     available_width = page_size[0] - 1*cm
     total_width = sum(col_widths)
+    
+    # Calculate dynamic font size if content is too wide
+    actual_font_size = font_size
     if total_width > available_width:
-        # Scale down proportionally
+        # Try to reduce font size first before scaling columns
         scale_factor = available_width / total_width
-        col_widths = [w * scale_factor for w in col_widths]
+        
+        # If we need to scale down significantly, adjust font size
+        if scale_factor < 0.85:
+            # Calculate new font size (minimum 8pt)
+            new_font_size = max(8, int(font_size * scale_factor))
+            if new_font_size < font_size:
+                # Recalculate widths with smaller font
+                font_reduction_factor = new_font_size / font_size
+                col_widths = [w * font_reduction_factor if i >= 3 and i < total_cols - 1 else w 
+                             for i, w in enumerate(col_widths)]
+                actual_font_size = new_font_size
+                total_width = sum(col_widths)
+        
+        # Final scaling if still too wide
+        if total_width > available_width:
+            scale_factor = available_width / total_width
+            col_widths = [w * scale_factor for w in col_widths]
     
     # Create table
     table = Table(table_data, colWidths=col_widths, repeatRows=4)
@@ -380,16 +516,16 @@ def generate_spreadsheet_pdf(data, config, signatories=None):
         # Header rows styling
         ('FONTNAME', (0, 0), (-1, 3), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (2, 3), 8),  # Base columns
-        ('FONTSIZE', (3, 0), (3, 0), 12),  # Semester label - larger
-        ('FONTSIZE', (3, 1), (3, 1), 8),  # Course headers - larger for better visualization
-        ('FONTSIZE', (3, 2), (-1, 3), 8),  # Status and credit units - larger
+        ('FONTSIZE', (3, 0), (-1, 0), 11),  # Semester labels - larger
+        ('FONTSIZE', (3, 1), (-1, 1), 7),  # Course headers - smaller for better fit
+        ('FONTSIZE', (3, 2), (-1, 3), 7),  # Status and credit units - smaller
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, 3), 'BOTTOM'),  # Header rows - bottom alignment
         ('VALIGN', (0, 4), (-1, -1), 'MIDDLE'),  # Data rows - middle alignment
         
-        # Data rows styling
+        # Data rows styling - use dynamic font size
         ('FONTNAME', (0, 4), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 4), (-1, -1), 9),
+        ('FONTSIZE', (0, 4), (-1, -1), actual_font_size),
         
         # Grid - Black lines
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
@@ -402,28 +538,62 @@ def generate_spreadsheet_pdf(data, config, signatories=None):
         ('SPAN', (0, 0), (0, 3)),  # S/N - spans all 4 header rows
         ('SPAN', (1, 0), (1, 3)),  # Matric - spans all 4 header rows
         ('SPAN', (2, 0), (2, 3)),  # Name - spans all 4 header rows
-        
-        # Span semester label across all course and summary columns (not including Remarks)
-        ('SPAN', (3, 0), (3 + course_cols + summary_cols - 1, 0)),
-        
-        # Span Remarks column (last column) - spans all 4 header rows
-        ('SPAN', (3 + course_cols + summary_cols, 0), (3 + course_cols + summary_cols, 3)),
-        
-        # Add thicker border for semester label
-        ('BOX', (3, 0), (3 + course_cols + summary_cols - 1, 0), 1.5, colors.black),
     ])
     
-    # Span course name headers (row 1) - each course column spans only row 1
-    col_idx = 3
-    for _ in courses_to_show:
-        # Row 1 has course name (single row, not spanned)
-        # Row 2 has course status (not spanned)
-        # Row 3 has credit unit (not spanned)
-        col_idx += 1
-    
-    # Span summary headers (rows 1, 2, 3 for CUP, CUF, TCU, GPA)
-    for i in range(summary_cols):
-        style.add('SPAN', (col_idx + i, 1), (col_idx + i, 3))  # Span rows 1-3 for summary columns
+    if show_combined:
+        # COMBINED FORMAT SPANNING
+        # Calculate column positions
+        first_sem_start = 3
+        first_sem_end = first_sem_start + first_sem_course_cols + first_sem_summary_cols - 1
+        
+        second_sem_start = first_sem_end + 1
+        second_sem_end = second_sem_start + second_sem_course_cols + second_sem_summary_cols - 1
+        
+        session_summary_start = second_sem_end + 1
+        session_summary_end = session_summary_start + session_summary_cols - 1
+        
+        remarks_col = session_summary_end + 1
+        
+        # Span "FIRST SEMESTER" label across first semester courses and summary
+        style.add('SPAN', (first_sem_start, 0), (first_sem_end, 0))
+        style.add('BOX', (first_sem_start, 0), (first_sem_end, 0), 1.5, colors.black)
+        
+        # Span "SECOND SEMESTER" label across second semester courses and summary
+        style.add('SPAN', (second_sem_start, 0), (second_sem_end, 0))
+        style.add('BOX', (second_sem_start, 0), (second_sem_end, 0), 1.5, colors.black)
+        
+        # Span "Remarks" column across all 4 header rows
+        style.add('SPAN', (remarks_col, 0), (remarks_col, 3))
+        
+        # Span summary columns (rows 2, 3, 4) for first semester
+        first_sem_summary_start = first_sem_start + first_sem_course_cols
+        for i in range(first_sem_summary_cols):
+            style.add('SPAN', (first_sem_summary_start + i, 1), (first_sem_summary_start + i, 3))
+        
+        # Span summary columns (rows 2, 3, 4) for second semester
+        second_sem_summary_start = second_sem_start + second_sem_course_cols
+        for i in range(second_sem_summary_cols):
+            style.add('SPAN', (second_sem_summary_start + i, 1), (second_sem_summary_start + i, 3))
+        
+        # Span session summary columns (rows 2, 3, 4)
+        for i in range(session_summary_cols):
+            style.add('SPAN', (session_summary_start + i, 1), (session_summary_start + i, 3))
+    else:
+        # SINGLE SEMESTER FORMAT SPANNING
+        course_cols = len(courses_to_show)
+        summary_cols = 4
+        
+        # Span semester label across all course and summary columns
+        style.add('SPAN', (3, 0), (3 + course_cols + summary_cols - 1, 0))
+        style.add('BOX', (3, 0), (3 + course_cols + summary_cols - 1, 0), 1.5, colors.black)
+        
+        # Span Remarks column (last column) - spans all 4 header rows
+        style.add('SPAN', (3 + course_cols + summary_cols, 0), (3 + course_cols + summary_cols, 3))
+        
+        # Span summary headers (rows 2, 3, 4 for CUF, CUP, TCU, GPA)
+        summary_start_col = 3 + course_cols
+        for i in range(summary_cols):
+            style.add('SPAN', (summary_start_col + i, 1), (summary_start_col + i, 3))
 
     
     table.setStyle(style)

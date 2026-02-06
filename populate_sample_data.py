@@ -75,22 +75,22 @@ with app.app_context():
     # Create students
     students_data = [
         # Computer Science 100 Level
-        {'matric': 'CS/2025/001', 'surname': 'Johnson', 'first_name': 'Adekunle', 'program': 'Computer Science', 'level': 100},
-        {'matric': 'CS/2025/002', 'surname': 'Mohammed', 'first_name': 'Fatima', 'program': 'Computer Science', 'level': 100},
-        {'matric': 'CS/2025/003', 'surname': 'Okafor', 'first_name': 'Chinedu', 'program': 'Computer Science', 'level': 100},
-        {'matric': 'CS/2025/004', 'surname': 'Eze', 'first_name': 'Blessing', 'program': 'Computer Science', 'level': 100},
-        {'matric': 'CS/2025/005', 'surname': 'Garba', 'first_name': 'Ibrahim', 'program': 'Computer Science', 'level': 100},
+        {'matric': 'CS/2025/001', 'surname': 'Johnson', 'first_name': 'Adekunle', 'gender': 'M', 'program': 'Computer Science', 'level': 100},
+        {'matric': 'CS/2025/002', 'surname': 'Mohammed', 'first_name': 'Fatima', 'gender': 'F', 'program': 'Computer Science', 'level': 100},
+        {'matric': 'CS/2025/003', 'surname': 'Okafor', 'first_name': 'Chinedu', 'gender': 'M', 'program': 'Computer Science', 'level': 100},
+        {'matric': 'CS/2025/004', 'surname': 'Eze', 'first_name': 'Blessing', 'gender': 'F', 'program': 'Computer Science', 'level': 100},
+        {'matric': 'CS/2025/005', 'surname': 'Garba', 'first_name': 'Ibrahim', 'gender': 'M', 'program': 'Computer Science', 'level': 100},
         # Computer Science 200 Level
-        {'matric': 'CS/2024/001', 'surname': 'Nwosu', 'first_name': 'Adaeze', 'program': 'Computer Science', 'level': 200},
-        {'matric': 'CS/2024/002', 'surname': 'Abdullahi', 'first_name': 'Yusuf', 'program': 'Computer Science', 'level': 200},
-        {'matric': 'CS/2024/003', 'surname': 'Okoro', 'first_name': 'Grace', 'program': 'Computer Science', 'level': 200},
+        {'matric': 'CS/2024/001', 'surname': 'Nwosu', 'first_name': 'Adaeze', 'gender': 'F', 'program': 'Computer Science', 'level': 200},
+        {'matric': 'CS/2024/002', 'surname': 'Abdullahi', 'first_name': 'Yusuf', 'gender': 'M', 'program': 'Computer Science', 'level': 200},
+        {'matric': 'CS/2024/003', 'surname': 'Okoro', 'first_name': 'Grace', 'gender': 'F', 'program': 'Computer Science', 'level': 200},
         # Software Engineering 100 Level
-        {'matric': 'SE/2025/001', 'surname': 'Obi', 'first_name': 'Emeka', 'program': 'Software Engineering', 'level': 100},
-        {'matric': 'SE/2025/002', 'surname': 'Bello', 'first_name': 'Aisha', 'program': 'Software Engineering', 'level': 100},
-        {'matric': 'SE/2025/003', 'surname': 'Adeyemi', 'first_name': 'Michael', 'program': 'Software Engineering', 'level': 100},
+        {'matric': 'SE/2025/001', 'surname': 'Obi', 'first_name': 'Emeka', 'gender': 'M', 'program': 'Software Engineering', 'level': 100},
+        {'matric': 'SE/2025/002', 'surname': 'Bello', 'first_name': 'Aisha', 'gender': 'F', 'program': 'Software Engineering', 'level': 100},
+        {'matric': 'SE/2025/003', 'surname': 'Adeyemi', 'first_name': 'Michael', 'gender': 'M', 'program': 'Software Engineering', 'level': 100},
         # Cyber Security 100 Level
-        {'matric': 'CY/2025/001', 'surname': 'Adebayo', 'first_name': 'Funmilayo', 'program': 'Cyber Security', 'level': 100},
-        {'matric': 'CY/2025/002', 'surname': 'Hassan', 'first_name': 'Khalid', 'program': 'Cyber Security', 'level': 100},
+        {'matric': 'CY/2025/001', 'surname': 'Adebayo', 'first_name': 'Funmilayo', 'gender': 'F', 'program': 'Cyber Security', 'level': 100},
+        {'matric': 'CY/2025/002', 'surname': 'Hassan', 'first_name': 'Khalid', 'gender': 'M', 'program': 'Cyber Security', 'level': 100},
     ]
     
     for std_data in students_data:
@@ -99,6 +99,7 @@ with app.app_context():
                 matric_number=std_data['matric'],
                 surname=std_data['surname'],
                 first_name=std_data['first_name'],
+                gender=std_data.get('gender'),
                 program=std_data['program'],
                 level=std_data['level'],
                 session_id=session.id,

@@ -129,6 +129,7 @@ def upload():
                     existing.surname = record['surname']
                     existing.first_name = record['first_name']
                     existing.other_names = record['other_names']
+                    existing.gender = record.get('gender')
                     existing.level = level
                     existing.program = program
                     updated += 1
@@ -139,6 +140,7 @@ def upload():
                         surname=record['surname'],
                         first_name=record['first_name'],
                         other_names=record['other_names'],
+                        gender=record.get('gender'),
                         level=level,
                         program=program,
                         session_id=current_session.id
@@ -211,6 +213,7 @@ def create():
         surname = request.form.get('surname', '').strip().upper()
         first_name = request.form.get('first_name', '').strip().title()
         other_names = request.form.get('other_names', '').strip().title()
+        gender = request.form.get('gender', '').strip().upper()
         level = request.form.get('level', type=int)
         program = request.form.get('program', '')
         
@@ -243,6 +246,7 @@ def create():
             surname=surname,
             first_name=first_name,
             other_names=other_names or None,
+            gender=gender if gender in ['M', 'F'] else None,
             level=level,
             program=program,
             session_id=current_session.id
@@ -404,6 +408,8 @@ def edit(student_id):
         student.surname = request.form.get('surname', '').strip().upper()
         student.first_name = request.form.get('first_name', '').strip().title()
         student.other_names = request.form.get('other_names', '').strip().title() or None
+        gender = request.form.get('gender', '').strip().upper()
+        student.gender = gender if gender in ['M', 'F'] else None
         
         new_level = request.form.get('level', type=int)
         new_program = request.form.get('program', '')

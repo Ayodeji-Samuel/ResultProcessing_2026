@@ -85,6 +85,7 @@
                                     <option value="">-- Select Semester --</option>
                                     <option value="1" {{ 'selected' if request.args.get('semester') == '1' }}>First Semester</option>
                                     <option value="2" {{ 'selected' if request.args.get('semester') == '2' }}>Second Semester</option>
+                                    <option value="both" {{ 'selected' if request.args.get('semester') == 'both' }}>Both Semesters</option>
                                 </select>
                             </div>
                             

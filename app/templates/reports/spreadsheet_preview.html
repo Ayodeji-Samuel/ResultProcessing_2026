@@ -24,22 +24,66 @@
             </p>
         </div>
         <div class="flex gap-3">
-            <form method="POST" action="{{ url_for('reports.spreadsheet') }}">
+            <button type="button" onclick="openDownloadModal()" class="px-6 py-2.5 bg-gradient-to-r from-primary-600 to-blue-600 text-white rounded-lg hover:from-primary-700 hover:to-blue-700 transition-all font-medium flex items-center shadow-lg">
+                <i class="ri-download-2-line mr-2"></i>
+                Download PDF
+            </button>
+            <a href="{{ url_for('reports.spreadsheet') }}" class="px-6 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium flex items-center">
+                <i class="ri-arrow-left-line mr-2"></i>
+                Back
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Download Modal -->
+<div id="downloadModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Download PDF</h3>
+            <form method="POST" action="{{ url_for('reports.spreadsheet') }}" id="downloadForm">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="program" value="{{ program }}">
                 <input type="hidden" name="level" value="{{ level }}">
                 <input type="hidden" name="semester" value="{{ semester }}">
                 <input type="hidden" name="session_id" value="{{ session.id }}">
                 <input type="hidden" name="action" value="download">
-                <button type="submit" class="px-6 py-2.5 bg-gradient-to-r from-primary-600 to-blue-600 text-white rounded-lg hover:from-primary-700 hover:to-blue-700 transition-all font-medium flex items-center shadow-lg">
-                    <i class="ri-download-2-line mr-2"></i>
-                    Download PDF
-                </button>
+                
+                <div class="mb-4">
+                    <label for="dean_name" class="block text-sm font-medium text-gray-700 mb-2">
+                        Dean's Full Name <span class="text-red-500">*</span>
+                    </label>
+                    <input type="text" id="dean_name" name="dean_name" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                           placeholder="Enter Dean's full name">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="font_size" class="block text-sm font-medium text-gray-700 mb-2">
+                        Font Size (minimum 10pt)
+                    </label>
+                    <select id="font_size" name="font_size"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500">
+                        <option value="10" selected>10pt (Default)</option>
+                        <option value="11">11pt</option>
+                        <option value="12">12pt</option>
+                        <option value="13">13pt</option>
+                        <option value="14">14pt</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">Smaller font allows more content to fit. Auto-adjusts if needed.</p>
+                </div>
+                
+                <div class="flex gap-3 justify-end">
+                    <button type="button" onclick="closeDownloadModal()"
+                            class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700">
+                        Download
+                    </button>
+                </div>
             </form>
-            <a href="{{ url_for('reports.spreadsheet') }}" class="px-6 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium flex items-center">
-                <i class="ri-arrow-left-line mr-2"></i>
-                Back
-            </a>
         </div>
     </div>
 </div>
@@ -113,42 +157,240 @@
         {% if students %}
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200 border border-gray-300 text-sm">
+                {% if semester == 'both' %}
+                <!-- COMBINED SEMESTERS FORMAT -->
+                <thead class="bg-gradient-to-r from-gray-700 to-gray-800 text-white">
+                    <!-- Row 1: Semester Labels -->
+                    <tr>
+                        <th rowspan="4" class="px-3 py-3 text-center border-r border-gray-600 font-semibold align-middle">S/N</th>
+                        <th rowspan="4" class="px-4 py-3 text-left border-r border-gray-600 font-semibold align-middle">Matric No</th>
+                        <th rowspan="4" class="px-4 py-3 text-left border-r border-gray-600 font-semibold align-middle">Name</th>
+                        
+                        <!-- First Semester Span -->
+                        <th colspan="{{ (first_semester_courses|length) + 4 }}" class="px-4 py-2 text-center border-r border-gray-600 font-bold bg-blue-700 text-lg">
+                            FIRST SEMESTER
+                        </th>
+                        
+                        <!-- Second Semester Span -->
+                        <th colspan="{{ (second_semester_courses|length) + 4 }}" class="px-4 py-2 text-center border-r border-gray-600 font-bold bg-purple-700 text-lg">
+                            SECOND SEMESTER
+                        </th>
+                        
+                        <!-- Session Summary Columns (Individual) -->
+                        <th rowspan="4" class="px-2 py-2 text-center border-l border-gray-600 font-semibold" style="height: 140px;">
+                            <div class="vertical-text-container">
+                                <span class="vertical-text-bottomup text-xs">Total Credit Unit Failed Session</span>
+                            </div>
+                        </th>
+                        <th rowspan="4" class="px-2 py-2 text-center border-l border-gray-600 font-semibold" style="height: 140px;">
+                            <div class="vertical-text-container">
+                                <span class="vertical-text-bottomup text-xs">Total Credit Unit Passed Session</span>
+                            </div>
+                        </th>
+                        <th rowspan="4" class="px-2 py-2 text-center border-l border-gray-600 font-semibold" style="height: 140px;">
+                            <div class="vertical-text-container">
+                                <span class="vertical-text-bottomup text-xs">Total Credit Unit Session</span>
+                            </div>
+                        </th>
+                        <th rowspan="4" class="px-2 py-2 text-center border-l border-r border-gray-600 font-semibold" style="height: 140px;">
+                            <div class="vertical-text-container">
+                                <span class="vertical-text-bottomup text-xs">CGPA</span>
+                            </div>
+                        </th>
+                        
+                        <th rowspan="4" class="px-3 py-3 text-center font-semibold align-middle">Remarks</th>
+                    </tr>
+                    
+                    <!-- Row 2: Course Headers (Vertical Text) -->
+                    <tr>
+                        <!-- First Semester Courses -->
+                        {% for course in first_semester_courses %}
+                        <th class="px-2 py-2 text-center border-l border-r border-gray-600 font-semibold align-bottom" style="height: 140px; position: relative;">
+                            <div class="vertical-text-container">
+                                <span class="vertical-text-bottomup font-bold text-xs">{{ course.code }}: {{ course.title[:25] }}{% if course.title|length > 25 %}...{% endif %}</span>
+                            </div>
+                        </th>
+                        {% endfor %}
+                        
+                        <!-- First Semester Summary -->
+                        <th rowspan="3" class="px-2 py-2 text-center border-l border-gray-600 font-semibold" style="height: 140px;">
+                            <div class="vertical-text-container">
+                                <span class="vertical-text-bottomup text-xs">Total Credit Unit Failed</span>
+                            </div>
+                        </th>
+                        <th rowspan="3" class="px-2 py-2 text-center border-l border-gray-600 font-semibold" style="height: 140px;">
+                            <div class="vertical-text-container">
+                                <span class="vertical-text-bottomup text-xs">Total Credit Unit Passed</span>
+                            </div>
+                        </th>
+                        <th rowspan="3" class="px-2 py-2 text-center border-l border-gray-600 font-semibold" style="height: 140px;">
+                            <div class="vertical-text-container">
+                                <span class="vertical-text-bottomup text-xs">Total Credit Unit</span>
+                            </div>
+                        </th>
+                        <th rowspan="3" class="px-2 py-2 text-center border-l border-r border-gray-600 font-semibold" style="height: 140px;">
+                            <div class="vertical-text-container">
+                                <span class="vertical-text-bottomup text-xs">GPA</span>
+                            </div>
+                        </th>
+                        
+                        <!-- Second Semester Courses -->
+                        {% for course in second_semester_courses %}
+                        <th class="px-2 py-2 text-center border-l border-r border-gray-600 font-semibold align-bottom" style="height: 140px; position: relative;">
+                            <div class="vertical-text-container">
+                                <span class="vertical-text-bottomup font-bold text-xs">{{ course.code }}: {{ course.title[:25] }}{% if course.title|length > 25 %}...{% endif %}</span>
+                            </div>
+                        </th>
+                        {% endfor %}
+                        
+                        <!-- Second Semester Summary -->
+                        <th rowspan="3" class="px-2 py-2 text-center border-l border-gray-600 font-semibold" style="height: 140px;">
+                            <div class="vertical-text-container">
+                                <span class="vertical-text-bottomup text-xs">Total Credit Unit Failed</span>
+                            </div>
+                        </th>
+                        <th rowspan="3" class="px-2 py-2 text-center border-l border-gray-600 font-semibold" style="height: 140px;">
+                            <div class="vertical-text-container">
+                                <span class="vertical-text-bottomup text-xs">Total Credit Unit Passed</span>
+                            </div>
+                        </th>
+                        <th rowspan="3" class="px-2 py-2 text-center border-l border-gray-600 font-semibold" style="height: 140px;">
+                            <div class="vertical-text-container">
+                                <span class="vertical-text-bottomup text-xs">Total Credit Unit</span>
+                            </div>
+                        </th>
+                        <th rowspan="3" class="px-2 py-2 text-center border-l border-r border-gray-600 font-semibold" style="height: 140px;">
+                            <div class="vertical-text-container">
+                                <span class="vertical-text-bottomup text-xs">GPA</span>
+                            </div>
+                        </th>
+                    </tr>
+                    
+                    <!-- Row 3: Course Status (C, R, E) -->
+                    <tr>
+                        <!-- First Semester Courses Status -->
+                        {% for course in first_semester_courses %}
+                        <th class="px-2 py-1 text-center border-l border-r border-gray-600 text-xs font-semibold">
+                            {{ course.status }}
+                        </th>
+                        {% endfor %}
+                        
+                        <!-- Second Semester Courses Status -->
+                        {% for course in second_semester_courses %}
+                        <th class="px-2 py-1 text-center border-l border-r border-gray-600 text-xs font-semibold">
+                            {{ course.status }}
+                        </th>
+                        {% endfor %}
+                    </tr>
+                    
+                    <!-- Row 4: Credit Units -->
+                    <tr>
+                        <!-- First Semester Courses Credit Units -->
+                        {% for course in first_semester_courses %}
+                        <th class="px-2 py-1 text-center border-l border-r border-gray-600 text-xs font-semibold">
+                            {{ course.credit_unit }}
+                        </th>
+                        {% endfor %}
+                        
+                        <!-- Second Semester Courses Credit Units -->
+                        {% for course in second_semester_courses %}
+                        <th class="px-2 py-1 text-center border-l border-r border-gray-600 text-xs font-semibold">
+                            {{ course.credit_unit }}
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for data in students %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-3 py-3 text-center border-r border-gray-200 font-medium text-gray-900">{{ loop.index }}</td>
+                        <td class="px-4 py-3 border-r border-gray-200 font-medium text-gray-900">{{ data.matric_number }}</td>
+                        <td class="px-4 py-3 border-r border-gray-200 text-gray-700">
+                            {{ data.name }}{% if data.gender == 'F' %} (Miss){% endif %}
+                        </td>
+                        
+                        <!-- First Semester Courses -->
+                        {% for course in first_semester_courses %}
+                        <td class="px-2 py-3 text-center border-l border-r border-gray-200 text-gray-700">
+                            {{ data.first_semester.get(course.code, '-') }}
+                        </td>
+                        {% endfor %}
+                        
+                        <!-- First Semester Summary -->
+                        <td class="px-3 py-3 text-center border-l border-gray-200 font-bold text-red-600">{{ data.first_semester_summary.failed_units }}</td>
+                        <td class="px-3 py-3 text-center border-l border-gray-200 font-bold text-green-600">{{ data.first_semester_summary.passed_units }}</td>
+                        <td class="px-3 py-3 text-center border-l border-gray-200 font-bold text-gray-900">{{ data.first_semester_summary.total_units }}</td>
+                        <td class="px-3 py-3 text-center border-l border-r border-gray-200 font-bold text-primary-600">{{ "%.2f"|format(data.first_semester_summary.gpa) }}</td>
+                        
+                        <!-- Second Semester Courses -->
+                        {% for course in second_semester_courses %}
+                        <td class="px-2 py-3 text-center border-l border-r border-gray-200 text-gray-700">
+                            {{ data.second_semester.get(course.code, '-') }}
+                        </td>
+                        {% endfor %}
+                        
+                        <!-- Second Semester Summary -->
+                        <td class="px-3 py-3 text-center border-l border-gray-200 font-bold text-red-600">{{ data.second_semester_summary.failed_units }}</td>
+                        <td class="px-3 py-3 text-center border-l border-gray-200 font-bold text-green-600">{{ data.second_semester_summary.passed_units }}</td>
+                        <td class="px-3 py-3 text-center border-l border-gray-200 font-bold text-gray-900">{{ data.second_semester_summary.total_units }}</td>
+                        <td class="px-3 py-3 text-center border-l border-r border-gray-200 font-bold text-primary-600">{{ "%.2f"|format(data.second_semester_summary.gpa) }}</td>
+                        
+                        <!-- Session Summary -->
+                        <td class="px-3 py-3 text-center border-l border-gray-200 font-bold text-red-700">{{ data.session_summary.failed_units }}</td>
+                        <td class="px-3 py-3 text-center border-l border-gray-200 font-bold text-green-700">{{ data.session_summary.passed_units }}</td>
+                        <td class="px-3 py-3 text-center border-l border-gray-200 font-bold text-gray-900">{{ data.session_summary.total_units }}</td>
+                        <td class="px-3 py-3 text-center border-l border-r border-gray-200 font-bold text-blue-700">{{ "%.2f"|format(data.session_summary.cgpa) }}</td>
+                        
+                        <!-- Remarks -->
+                        <td class="px-3 py-3 text-center text-sm">
+                            {% if data.remark and data.remark.startswith('CO:') %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">{{ data.remark }}</span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{{ data.remark }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                
+                {% else %}
+                <!-- SINGLE SEMESTER FORMAT -->
                 <thead class="bg-gradient-to-r from-gray-700 to-gray-800 text-white">
                     <!-- Semester Spanning Row -->
                     <tr>
                         <th rowspan="4" class="px-3 py-3 text-center border-r border-gray-600 font-semibold align-middle">S/N</th>
                         <th rowspan="4" class="px-4 py-3 text-left border-r border-gray-600 font-semibold align-middle">Matric No</th>
                         <th rowspan="4" class="px-4 py-3 text-left border-r border-gray-600 font-semibold align-middle">Name</th>
-                        <th colspan="{{ (courses|length * 4) + 4 }}" class="px-4 py-2 text-center border-r border-gray-600 font-bold bg-primary-700 text-lg">
-                            {{ 'FIRST SEMESTER' if semester == '1' else 'SECOND SEMESTER' if semester == '2' else 'BOTH SEMESTERS' }}
+                        <th colspan="{{ (courses|length) + 4 }}" class="px-4 py-2 text-center border-r border-gray-600 font-bold bg-primary-700 text-lg">
+                            {{ 'FIRST SEMESTER' if semester == '1' else 'SECOND SEMESTER' }}
                         </th>
                         <th rowspan="4" class="px-3 py-3 text-center font-semibold align-middle">Remarks</th>
                     </tr>
                     <!-- Course Headers Row (Vertical Text) -->
                     <tr>
                         {% for course in courses %}
-                        <th colspan="4" class="px-2 py-2 text-center border-l border-r border-gray-600 font-semibold align-bottom" style="height: 140px; position: relative;">
+                        <th rowspan="3" class="px-2 py-2 text-center border-l border-r border-gray-600 font-semibold align-bottom" style="height: 140px; position: relative;">
                             <div class="vertical-text-container">
                                 <span class="vertical-text-bottomup font-bold text-xs">{{ course.course_code }}: {{ course.course_title[:25] }}{% if course.course_title|length > 25 %}...{% endif %}</span>
                             </div>
                         </th>
                         {% endfor %}
-                        <th class="px-2 py-2 text-center border-l border-gray-600 font-semibold" style="height: 140px;">
+                        <th rowspan="3" class="px-2 py-2 text-center border-l border-gray-600 font-semibold" style="height: 140px;">
                             <div class="vertical-text-container">
-                                <span class="vertical-text-bottomup text-xs">Credit Unit Passed</span>
+                                <span class="vertical-text-bottomup text-xs">Total Credit Unit Failed</span>
                             </div>
                         </th>
-                        <th class="px-2 py-2 text-center border-l border-gray-600 font-semibold" style="height: 140px;">
+                        <th rowspan="3" class="px-2 py-2 text-center border-l border-gray-600 font-semibold" style="height: 140px;">
                             <div class="vertical-text-container">
-                                <span class="vertical-text-bottomup text-xs">Credit Unit Failed</span>
+                                <span class="vertical-text-bottomup text-xs">Total Credit Unit Passed</span>
                             </div>
                         </th>
-                        <th class="px-2 py-2 text-center border-l border-gray-600 font-semibold" style="height: 140px;">
+                        <th rowspan="3" class="px-2 py-2 text-center border-l border-gray-600 font-semibold" style="height: 140px;">
                             <div class="vertical-text-container">
                                 <span class="vertical-text-bottomup text-xs">Total Credit Unit</span>
                             </div>
                         </th>
-                        <th class="px-2 py-2 text-center border-l border-r border-gray-600 font-semibold" style="height: 140px;">
+                        <th rowspan="3" class="px-2 py-2 text-center border-l border-r border-gray-600 font-semibold" style="height: 140px;">
                             <div class="vertical-text-container">
                                 <span class="vertical-text-bottomup text-xs">GPA</span>
                             </div>
@@ -157,27 +399,18 @@
                     <!-- Course Status Row (C, R, E) -->
                     <tr>
                         {% for course in courses %}
-                        <th colspan="4" class="px-2 py-1 text-center border-l border-r border-gray-600 text-xs font-semibold">
-                            {{ course.status }} ({{ course.credit_unit }} CU)
+                        <th class="px-2 py-1 text-center border-l border-r border-gray-600 text-xs font-semibold">
+                            {{ course.status }} 
                         </th>
                         {% endfor %}
-                        <th class="px-2 py-1 text-center border-l border-gray-600 text-xs"></th>
-                        <th class="px-2 py-1 text-center border-l border-gray-600 text-xs"></th>
-                        <th class="px-2 py-1 text-center border-l border-gray-600 text-xs"></th>
-                        <th class="px-2 py-1 text-center border-l border-r border-gray-600 text-xs"></th>
                     </tr>
-                    <!-- Sub-headers Row (CA, Ex, Tot, Gr) -->
+                    <!-- Credit Units Row -->
                     <tr>
                         {% for course in courses %}
-                        <th class="px-2 py-2 text-center border-l border-gray-600 text-xs">CA</th>
-                        <th class="px-2 py-2 text-center border-l border-gray-600 text-xs">Ex</th>
-                        <th class="px-2 py-2 text-center border-l border-gray-600 text-xs">Tot</th>
-                        <th class="px-2 py-2 text-center border-l border-r border-gray-600 text-xs">Gr</th>
+                        <th class="px-2 py-1 text-center border-l border-r border-gray-600 text-xs font-semibold">
+                            {{ course.credit_unit }} CU
+                        </th>
                         {% endfor %}
-                        <th class="px-2 py-2 text-center border-l border-gray-600 text-xs">CUP</th>
-                        <th class="px-2 py-2 text-center border-l border-gray-600 text-xs">CUF</th>
-                        <th class="px-2 py-2 text-center border-l border-gray-600 text-xs">TCU</th>
-                        <th class="px-2 py-2 text-center border-l border-r border-gray-600 text-xs">GPA</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
@@ -185,26 +418,25 @@
                     <tr class="hover:bg-gray-50 transition-colors">
                         <td class="px-3 py-3 text-center border-r border-gray-200 font-medium text-gray-900">{{ loop.index }}</td>
                         <td class="px-4 py-3 border-r border-gray-200 font-medium text-gray-900">{{ data.student.matric_number }}</td>
-                        <td class="px-4 py-3 border-r border-gray-200 text-gray-700">{{ data.student.surname }}, {{ data.student.first_name }}</td>
+                        <td class="px-4 py-3 border-r border-gray-200 text-gray-700">
+                            {{ data.student.surname }}, {{ data.student.first_name }}{% if data.student.gender == 'F' %} (Miss){% endif %}
+                        </td>
                         {% for course in courses %}
                         {% set result = data.results.get(course.id) %}
-                        <td class="px-2 py-3 text-center border-l border-gray-200 text-gray-700">{{ result.ca_score|round(1) if result and result.ca_score else '-' }}</td>
-                        <td class="px-2 py-3 text-center border-l border-gray-200 text-gray-700">{{ result.exam_score|round(1) if result and result.exam_score else '-' }}</td>
-                        <td class="px-2 py-3 text-center border-l border-gray-200 font-medium text-gray-900">{{ result.total_score|round(1) if result and result.total_score else '-' }}</td>
                         <td class="px-2 py-3 text-center border-l border-r border-gray-200">
-                            {% if result and result.grade %}
+                            {% if result %}
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold
                                 {{ 'bg-green-100 text-green-800' if result.grade in ['A', 'B'] else 
                                    'bg-yellow-100 text-yellow-800' if result.grade in ['C', 'D'] else 
                                    'bg-gray-100 text-gray-800' if result.grade == 'E' else 
                                    'bg-red-100 text-red-800' }}">
-                                {{ result.grade }}
+                                {{ result.total_score|round(1) }} ({{ result.grade }})
                             </span>
                             {% else %}-{% endif %}
                         </td>
                         {% endfor %}
-                        <td class="px-3 py-3 text-center border-l border-gray-200 font-bold text-green-600">{{ data.cup }}</td>
                         <td class="px-3 py-3 text-center border-l border-gray-200 font-bold text-red-600">{{ data.cuf }}</td>
+                        <td class="px-3 py-3 text-center border-l border-gray-200 font-bold text-green-600">{{ data.cup }}</td>
                         <td class="px-3 py-3 text-center border-l border-gray-200 font-bold text-gray-900">{{ data.tcu }}</td>
                         <td class="px-3 py-3 text-center border-l border-r border-gray-200 font-bold text-primary-600">{{ "%.2f"|format(data.gpa) }}</td>
                         <td class="px-3 py-3 text-center text-sm">
@@ -217,6 +449,7 @@
                     </tr>
                     {% endfor %}
                 </tbody>
+                {% endif %}
             </table>
         </div>
         
@@ -226,6 +459,42 @@
                 <i class="ri-information-line mr-2 text-blue-600"></i>
                 Course Legend
             </h3>
+            {% if semester == 'both' %}
+            <!-- Combined Semesters Legend -->
+            <div class="mb-4">
+                <h4 class="text-xs font-bold text-blue-700 mb-2">FIRST SEMESTER</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {% for course in first_semester_courses %}
+                    <div class="flex items-start p-2 bg-white rounded border border-gray-200">
+                        <span class="inline-flex items-center justify-center px-2 py-1 mr-2 text-xs font-bold text-blue-700 bg-blue-100 rounded">
+                            {{ course.code }}
+                        </span>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm text-gray-900 font-medium truncate">{{ course.title }}</p>
+                            <p class="text-xs text-gray-500">{{ course.credit_unit }} Credit Unit{{ 's' if course.credit_unit != 1 else '' }} - {{ course.status }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div>
+                <h4 class="text-xs font-bold text-purple-700 mb-2">SECOND SEMESTER</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {% for course in second_semester_courses %}
+                    <div class="flex items-start p-2 bg-white rounded border border-gray-200">
+                        <span class="inline-flex items-center justify-center px-2 py-1 mr-2 text-xs font-bold text-purple-700 bg-purple-100 rounded">
+                            {{ course.code }}
+                        </span>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm text-gray-900 font-medium truncate">{{ course.title }}</p>
+                            <p class="text-xs text-gray-500">{{ course.credit_unit }} Credit Unit{{ 's' if course.credit_unit != 1 else '' }} - {{ course.status }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <!-- Single Semester Legend -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {% for course in courses %}
                 <div class="flex items-start p-2 bg-white rounded border border-gray-200">
@@ -234,11 +503,12 @@
                     </span>
                     <div class="flex-1 min-w-0">
                         <p class="text-sm text-gray-900 font-medium truncate">{{ course.course_title }}</p>
-                        <p class="text-xs text-gray-500">{{ course.credit_unit }} Credit Unit{{ 's' if course.credit_unit != 1 else '' }}</p>
+                        <p class="text-xs text-gray-500">{{ course.credit_unit }} Credit Unit{{ 's' if course.credit_unit != 1 else '' }} - {{ course.status }}</p>
                     </div>
                 </div>
                 {% endfor %}
             </div>
+            {% endif %}
         </div>
         {% else %}
         <div class="text-center py-16">
@@ -343,4 +613,23 @@
         background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
     }
 </style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function openDownloadModal() {
+        document.getElementById('downloadModal').classList.remove('hidden');
+    }
+    
+    function closeDownloadModal() {
+        document.getElementById('downloadModal').classList.add('hidden');
+    }
+    
+    // Close modal when clicking outside
+    document.getElementById('downloadModal')?.addEventListener('click', function(event) {
+        if (event.target === this) {
+            closeDownloadModal();
+        }
+    });
+</script>
 {% endblock %}

@@ -73,16 +73,17 @@ def spreadsheet():
         first_sem_courses = []
         second_sem_courses = []
         
-        # Always get first semester courses
-        first_sem_courses = Course.query.filter_by(
-            level=level,
-            program=program,
-            semester=1,
-            is_active=True
-        ).order_by(Course.course_code).all()
+        # Get first semester courses if semester is '1' or 'both'
+        if semester in ['1', 'both']:
+            first_sem_courses = Course.query.filter_by(
+                level=level,
+                program=program,
+                semester=1,
+                is_active=True
+            ).order_by(Course.course_code).all()
         
-        # Get second semester courses if semester is 2
-        if semester == '2':
+        # Get second semester courses if semester is '2' or 'both'
+        if semester in ['2', 'both']:
             second_sem_courses = Course.query.filter_by(
                 level=level,
                 program=program,
@@ -101,15 +102,20 @@ def spreadsheet():
             student_row = {
                 'matric_number': student.matric_number,
                 'name': student.full_name,
+                'gender': student.gender,
                 'first_semester': {},
                 'second_semester': {},
                 'first_semester_summary': {'passed_units': 0, 'failed_units': 0, 'total_units': 0, 'gpa': 0},
-                'second_semester_summary': {'passed_units': 0, 'failed_units': 0, 'total_units': 0, 'gpa': 0}
+                'second_semester_summary': {'passed_units': 0, 'failed_units': 0, 'total_units': 0, 'gpa': 0},
+                'session_summary': {'passed_units': 0, 'failed_units': 0, 'total_units': 0, 'cgpa': 0}
             }
+            
+            # Initialize result lists
+            first_sem_results = []
+            second_sem_results = []
             
             # First semester results
             if first_sem_courses:
-                first_sem_results = []
                 for course in first_sem_courses:
                     result = Result.query.filter_by(
                         student_id=student.id,
@@ -136,7 +142,6 @@ def spreadsheet():
             
             # Second semester results
             if second_sem_courses:
-                second_sem_results = []
                 for course in second_sem_courses:
                     result = Result.query.filter_by(
                         student_id=student.id,
@@ -159,6 +164,18 @@ def spreadsheet():
                         'failed_units': summary['failed'],
                         'total_units': summary['total'],
                         'gpa': calculate_gpa(second_sem_results)
+                    }
+            
+            # Calculate session summary if both semesters requested
+            if semester == 'both' and (first_sem_results or second_sem_results):
+                all_sem_results = first_sem_results + second_sem_results
+                if all_sem_results:
+                    session_summary = get_credit_units_summary(all_sem_results)
+                    student_row['session_summary'] = {
+                        'passed_units': session_summary['passed'],
+                        'failed_units': session_summary['failed'],
+                        'total_units': session_summary['total'],
+                        'cgpa': calculate_gpa(all_sem_results)
                     }
             
             # Get active carryovers for remark
@@ -239,7 +256,11 @@ def spreadsheet():
                 'dean': dean_name
             }
             
-            pdf_buffer = generate_spreadsheet_pdf(data, config, signatories)
+            # Get font size from form (default 10, minimum 10)
+            font_size = request.form.get('font_size', type=int, default=10)
+            font_size = max(10, font_size)  # Ensure minimum of 10
+            
+            pdf_buffer = generate_spreadsheet_pdf(data, config, signatories, font_size=font_size)
             
             filename = f"results_{program.replace(' ', '_')}_{level}_{semester}_{current_session.session_name.replace('/', '-')}.pdf"
             
@@ -250,107 +271,142 @@ def spreadsheet():
                 download_name=filename
             )
         else:
-            # Preview - prepare combined data for template
-            # Combine courses based on semester selection
-            if semester == '1':
-                # Show only first semester
-                courses = first_sem_courses
-                courses_data = first_courses_data
-            elif semester == '2':
-                # Show both first and second semesters
-                courses = first_sem_courses + second_sem_courses
-                courses_data = first_courses_data + second_courses_data
-            
-            # Calculate total credits
-            total_credits = sum(c.credit_unit for c in courses)
-            
-            # Build student_data for template with detailed results
-            student_data = []
-            total_gpa = 0
-            students_with_gpa = 0
-            
-            for student in students:
-                student_courses = [c for c in courses]
-                results_dict = {}
-                all_results = []
+            # Preview - prepare data for template
+            if semester == 'both':
+                # For combined semesters, pass students_data directly
+                # Calculate average CGPA for stats
+                total_cgpa = 0
+                students_with_cgpa = 0
                 
-                for course in student_courses:
-                    result = Result.query.filter_by(
-                        student_id=student.id,
-                        course_id=course.id,
-                        session_id=current_session.id
-                    ).first()
-                    if result:
-                        results_dict[course.id] = result
-                        all_results.append(result)
+                for student_data in students_data:
+                    cgpa = student_data.get('session_summary', {}).get('cgpa', 0)
+                    if cgpa > 0:
+                        total_cgpa += cgpa
+                        students_with_cgpa += 1
                 
-                # Calculate student's GPA
-                if all_results:
-                    summary = get_credit_units_summary(all_results)
-                    gpa = calculate_gpa(all_results)
-                    tcu = summary['total']
-                    cup = summary['passed']  # Credit Unit Passed
-                    cuf = summary['failed']  # Credit Unit Failed
-                    tgp = sum(r.grade_point * r.course.credit_unit for r in all_results if r.grade_point is not None)
-                else:
-                    gpa = 0
-                    tcu = 0
-                    cup = 0
-                    cuf = 0
-                    tgp = 0
+                average_cgpa = total_cgpa / students_with_cgpa if students_with_cgpa > 0 else 0
                 
-                # Get active carryovers for remark
-                active_carryovers = Carryover.query.filter_by(
-                    student_matric=student.matric_number,
-                    is_cleared=False
-                ).all()
+                # Calculate total credits (first + second semester)
+                total_credits = sum(c.credit_unit for c in first_sem_courses) + sum(c.credit_unit for c in second_sem_courses)
                 
-                if active_carryovers:
-                    # Format: "CO: CSC101, MTH201, PHY102"
-                    carryover_codes = []
-                    for co in active_carryovers:
-                        if co.course:
-                            carryover_codes.append(co.course.course_code)
-                    remark = "CO: " + ", ".join(carryover_codes) if carryover_codes else "Proceed"
-                else:
-                    remark = "Proceed"
+                return render_template('reports/spreadsheet_preview.html',
+                                       students=students_data,
+                                       first_semester_courses=first_courses_data,
+                                       second_semester_courses=second_courses_data,
+                                       level=level,
+                                       program=program,
+                                       semester=semester,
+                                       session=current_session,
+                                       current_session=current_session,
+                                       total_credits=total_credits,
+                                       average_gpa=average_cgpa,
+                                       config={
+                                           'university_name': Config.UNIVERSITY_NAME,
+                                           'faculty_name': Config.FACULTY_NAME,
+                                           'department_name': Config.DEPARTMENT_NAME
+                                       })
+            else:
+                # Single semester preview
+                # Combine courses based on semester selection
+                if semester == '1':
+                    # Show only first semester
+                    courses = first_sem_courses
+                    courses_data = first_courses_data
+                elif semester == '2':
+                    # Show only second semester
+                    courses = second_sem_courses
+                    courses_data = second_courses_data
                 
-                student_data.append({
-                    'student': student,
-                    'results': results_dict,
-                    'gpa': gpa,
-                    'tcu': tcu,
-                    'cup': cup,
-                    'cuf': cuf,
-                    'tgp': tgp,
-                    'remark': remark
-                })
+                # Calculate total credits
+                total_credits = sum(c.credit_unit for c in courses)
                 
-                if gpa > 0:
-                    total_gpa += gpa
-                    students_with_gpa += 1
-            
-            # Calculate average GPA
-            average_gpa = total_gpa / students_with_gpa if students_with_gpa > 0 else 0
-            
-            return render_template('reports/spreadsheet_preview.html',
-                                   students=students_data,
-                                   student_data=student_data,
-                                   courses=courses,
-                                   first_semester_courses=first_courses_data,
-                                   second_semester_courses=second_courses_data,
-                                   level=level,
-                                   program=program,
-                                   semester=semester,
-                                   session=current_session,
-                                   current_session=current_session,
-                                   total_credits=total_credits,
-                                   average_gpa=average_gpa,
-                                   config={
-                                       'university_name': Config.UNIVERSITY_NAME,
-                                       'faculty_name': Config.FACULTY_NAME,
-                                       'department_name': Config.DEPARTMENT_NAME
-                                   })
+                # Build student_data for template with detailed results
+                student_data = []
+                total_gpa = 0
+                students_with_gpa = 0
+                
+                for student in students:
+                    student_courses = [c for c in courses]
+                    results_dict = {}
+                    all_results = []
+                    
+                    for course in student_courses:
+                        result = Result.query.filter_by(
+                            student_id=student.id,
+                            course_id=course.id,
+                            session_id=current_session.id
+                        ).first()
+                        if result:
+                            results_dict[course.id] = result
+                            all_results.append(result)
+                    
+                    # Calculate student's GPA
+                    if all_results:
+                        summary = get_credit_units_summary(all_results)
+                        gpa = calculate_gpa(all_results)
+                        tcu = summary['total']
+                        cup = summary['passed']  # Credit Unit Passed
+                        cuf = summary['failed']  # Credit Unit Failed
+                        tgp = sum(r.grade_point * r.course.credit_unit for r in all_results if r.grade_point is not None)
+                    else:
+                        gpa = 0
+                        tcu = 0
+                        cup = 0
+                        cuf = 0
+                        tgp = 0
+                    
+                    # Get active carryovers for remark
+                    active_carryovers = Carryover.query.filter_by(
+                        student_matric=student.matric_number,
+                        is_cleared=False
+                    ).all()
+                    
+                    if active_carryovers:
+                        # Format: "CO: CSC101, MTH201, PHY102"
+                        carryover_codes = []
+                        for co in active_carryovers:
+                            if co.course:
+                                carryover_codes.append(co.course.course_code)
+                        remark = "CO: " + ", ".join(carryover_codes) if carryover_codes else "Proceed"
+                    else:
+                        remark = "Proceed"
+                    
+                    student_data.append({
+                        'student': student,
+                        'results': results_dict,
+                        'gpa': gpa,
+                        'tcu': tcu,
+                        'cup': cup,
+                        'cuf': cuf,
+                        'tgp': tgp,
+                        'remark': remark
+                    })
+                    
+                    if gpa > 0:
+                        total_gpa += gpa
+                        students_with_gpa += 1
+                
+                # Calculate average GPA
+                average_gpa = total_gpa / students_with_gpa if students_with_gpa > 0 else 0
+                
+                return render_template('reports/spreadsheet_preview.html',
+                                       students=students_data,
+                                       student_data=student_data,
+                                       courses=courses,
+                                       first_semester_courses=first_courses_data,
+                                       second_semester_courses=second_courses_data,
+                                       level=level,
+                                       program=program,
+                                       semester=semester,
+                                       session=current_session,
+                                       current_session=current_session,
+                                       total_credits=total_credits,
+                                       average_gpa=average_gpa,
+                                       config={
+                                           'university_name': Config.UNIVERSITY_NAME,
+                                           'faculty_name': Config.FACULTY_NAME,
+                                           'department_name': Config.DEPARTMENT_NAME
+                                       })
     
     # Get all academic sessions for dropdown
     sessions = AcademicSession.query.order_by(AcademicSession.session_name.desc()).all()
@@ -498,6 +554,7 @@ def student_result_pdf(student_id):
     student_data = {
         'matric_number': student.matric_number,
         'name': student.full_name,
+        'gender': student.gender,
         'program': student.program,
         'level': student.level
     }
@@ -590,11 +647,20 @@ def get_spreadsheet_summary():
         return jsonify({'error': 'Access denied'}), 403
     
     # Get courses for this program, level, and semester
-    courses = Course.query.filter_by(
-        program=program,
-        level=int(level),
-        semester=int(semester)
-    ).all()
+    # Handle semester: '1', '2', or 'both'
+    if semester == 'both':
+        # Get both first and second semester courses
+        courses = Course.query.filter_by(
+            program=program,
+            level=int(level)
+        ).filter(Course.semester.in_([1, 2])).all()
+    else:
+        # Get specific semester courses
+        courses = Course.query.filter_by(
+            program=program,
+            level=int(level),
+            semester=int(semester)
+        ).all()
     
     # Get students for this program and level
     students = Student.query.filter_by(
