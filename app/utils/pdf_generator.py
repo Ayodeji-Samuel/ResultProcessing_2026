@@ -433,8 +433,8 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10):
     # Name and Remarks columns use Paragraph objects so they word-wrap.
     # ─────────────────────────────────────────────────────────────────────────
 
-    # 2 pt total horizontal padding per cell (1 pt left + 1 pt right)
-    CELL_H_PAD = 2  # points
+    # 6 pt total horizontal padding per cell (3 pt left + 3 pt right, matches TableStyle)
+    CELL_H_PAD = 6  # points
 
     # Maximum width for the Remarks column – text wraps beyond this
     REMARKS_MAX_WIDTH = 2.5 * cm
@@ -477,22 +477,24 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10):
             col_widths.append(REMARKS_MAX_WIDTH)
 
         else:  # ── Course score or summary columns ─────────────────────────
-            # Width driven solely by DATA values; vertical headers go to height.
-            w = _tw('-')  # minimum: at least as wide as a dash
+            # Width is driven solely by DATA values (row 4+).
+            # Rows 0-3 may contain spanning labels (e.g. "FIRST SEMESTER") whose
+            # text sits at col 3 in the raw data even though it spans many cols –
+            # measuring those strings would wrongly inflate col 3's width.
+            # VerticalText headers contribute only to row height, so we use
+            # cell.fontSize as the bare minimum column width floor.
+            w = _tw('-')  # absolute minimum
             for row_idx, row in enumerate(table_data):
                 if col_idx >= len(row):
                     continue
                 cell = row[col_idx]
                 if isinstance(cell, VerticalText):
-                    # Rotated header → contributes only to row height, not width.
-                    # Use the font-size as an absolute floor for the column.
+                    # Rotated header → row height, not column width.
                     w = max(w, cell.fontSize)
-                elif row_idx < 4:
-                    # Non-vertical header cell (semester label, status, credit unit)
-                    w = max(w, _tw(str(cell), bold=True, fsize=8))
-                else:
-                    # Data row value (score like "80/A", CUF "0", GPA "4.50")
+                elif row_idx >= 4:
+                    # Data row value (e.g. "80A", "10", "4.50")
                     w = max(w, _tw(str(cell)))
+                # else: skip header text – may be a spanning label
             col_widths.append(w + CELL_H_PAD)
     
     # Adjust if total width exceeds page width
@@ -566,11 +568,11 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10):
         ('FONTNAME', (0, 4), (-1, -1), 'Helvetica'),
         ('FONTSIZE', (0, 4), (-1, -1), actual_font_size),
         
-        # Tight cell padding (1pt each side)
-        ('LEFTPADDING', (0, 0), (-1, -1), 1),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 1),
-        ('TOPPADDING', (0, 0), (-1, -1), 1),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        # Cell padding – small but readable
+        ('LEFTPADDING', (0, 0), (-1, -1), 3),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
 
         # Grid - Black lines
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
