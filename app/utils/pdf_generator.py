@@ -434,101 +434,94 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10,
         table_data.append(row)
     
     # ── Column width calculation ──────────────────────────────────────────────
-    # Each column is sized to its own content, with minimal cell padding.
-    # Vertical-text headers contribute to row height, not column width.
-    # Name and Remarks columns use Paragraph objects so they word-wrap.
+    # Two-pass approach: measure every column at the desired font size; if the
+    # total is wider than the page, pick a smaller actual_font_size and
+    # RE-MEASURE EVERYTHING at that size so content always fits its column.
+    # A final tiny uniform scale handles any integer-rounding overage.
     # ─────────────────────────────────────────────────────────────────────────
 
-    # 6 pt total horizontal padding per cell (3 pt left + 3 pt right, matches TableStyle)
+    # 6 pt total horizontal padding per cell (3 pt left + 3 pt right)
     CELL_H_PAD = 6  # points
 
     # Maximum width for the Remarks column – text wraps beyond this
     REMARKS_MAX_WIDTH = 2.5 * cm
 
-    def _tw(text, bold=False, fsize=font_size):
-        """Measure text width in points."""
-        return stringWidth(str(text), 'Helvetica-Bold' if bold else 'Helvetica', fsize)
+    def _tw(text, fsize=font_size):
+        """Measure plain-Helvetica text width in points."""
+        return stringWidth(str(text), 'Helvetica', fsize)
 
-    col_widths = []
+    def _compute_col_widths(fsize):
+        """Return ideal column widths when all data is rendered at `fsize`."""
+        widths = []
+        for col_idx in range(total_cols):
 
-    for col_idx in range(total_cols):
+            if col_idx == 0:  # ── S/N ──────────────────────────────────────
+                w = _tw('S/N', fsize=8)
+                for row in table_data[4:]:
+                    if col_idx < len(row):
+                        w = max(w, _tw(str(row[col_idx]), fsize=fsize))
+                widths.append(w + CELL_H_PAD)
 
-        if col_idx == 0:  # ── S/N ──────────────────────────────────────────
-            w = _tw('S/N', bold=True, fsize=8)
-            for row in table_data[4:]:
-                if col_idx < len(row):
-                    w = max(w, _tw(str(row[col_idx])))
-            col_widths.append(w + CELL_H_PAD)
+            elif col_idx == 1:  # ── Matric Number ───────────────────────────
+                w = _tw('Matric Number', fsize=8)
+                for row in table_data[4:]:
+                    if col_idx < len(row):
+                        w = max(w, _tw(str(row[col_idx]), fsize=fsize))
+                widths.append(w + CELL_H_PAD)
 
-        elif col_idx == 1:  # ── Matric Number ─────────────────────────────
-            w = _tw('Matric Number', bold=True, fsize=8)
-            for row in table_data[4:]:
-                if col_idx < len(row):
-                    w = max(w, _tw(str(row[col_idx])))
-            col_widths.append(w + CELL_H_PAD)
+            elif col_idx == 2:  # ── Student Name ─────────────────────────────
+                w = max(_tw('Student Name', fsize=8), _tw('(Surname First)', fsize=8))
+                for row in table_data[4:]:
+                    if col_idx < len(row):
+                        cell = row[col_idx]
+                        raw = cell if isinstance(cell, str) else str(cell)
+                        for line in raw.split('\n'):
+                            w = max(w, _tw(line, fsize=fsize))
+                widths.append(w + CELL_H_PAD)
 
-        elif col_idx == 2:  # ── Student Name ──────────────────────────────
-            # Header has two lines
-            w = max(_tw('Student Name', bold=True, fsize=8),
-                    _tw('(Surname First)', bold=True, fsize=8))
-            for row in table_data[4:]:
-                if col_idx < len(row):
+            elif col_idx == total_cols - 1:  # ── Remarks (capped / word-wrap) ─
+                widths.append(REMARKS_MAX_WIDTH)
+
+            else:  # ── Course score or summary columns ─────────────────────
+                # VerticalText headers contribute to ROW HEIGHT, not to column
+                # width. Use cell.fontSize as the bare minimum width floor so
+                # that very thin course columns still have legible content.
+                # Spanning labels in row 0-3 ("FIRST SEMESTER" etc.) are
+                # intentionally skipped to avoid inflating col 3's width.
+                w = _tw('-', fsize=fsize)
+                for row_idx, row in enumerate(table_data):
+                    if col_idx >= len(row):
+                        continue
                     cell = row[col_idx]
-                    raw = cell if isinstance(cell, str) else str(cell)
-                    for line in raw.split('\n'):
-                        w = max(w, _tw(line))
-            col_widths.append(w + CELL_H_PAD)
+                    if isinstance(cell, VerticalText):
+                        w = max(w, cell.fontSize)
+                    elif row_idx >= 4:
+                        w = max(w, _tw(str(cell), fsize=fsize))
+                widths.append(w + CELL_H_PAD)
 
-        elif col_idx == total_cols - 1:  # ── Remarks (capped / wrapping) ──
-            col_widths.append(REMARKS_MAX_WIDTH)
+        return widths
 
-        else:  # ── Course score or summary columns ─────────────────────────
-            # Width is driven solely by DATA values (row 4+).
-            # Rows 0-3 may contain spanning labels (e.g. "FIRST SEMESTER") whose
-            # text sits at col 3 in the raw data even though it spans many cols –
-            # measuring those strings would wrongly inflate col 3's width.
-            # VerticalText headers contribute only to row height, so we use
-            # cell.fontSize as the bare minimum column width floor.
-            w = _tw('-')  # absolute minimum
-            for row_idx, row in enumerate(table_data):
-                if col_idx >= len(row):
-                    continue
-                cell = row[col_idx]
-                if isinstance(cell, VerticalText):
-                    # Rotated header → row height, not column width.
-                    w = max(w, cell.fontSize)
-                elif row_idx >= 4:
-                    # Data row value (e.g. "80A", "10", "4.50")
-                    w = max(w, _tw(str(cell)))
-                # else: skip header text – may be a spanning label
-            col_widths.append(w + CELL_H_PAD)
-    
-    # Adjust if total width exceeds page width
     available_width = page_size[0] - 2 * _margin
+
+    # Pass 1: measure at the requested font size
+    col_widths = _compute_col_widths(font_size)
     total_width = sum(col_widths)
-    
-    # Calculate dynamic font size if content is too wide
     actual_font_size = font_size
+
     if total_width > available_width:
-        # Try to reduce font size first before scaling columns
-        scale_factor = available_width / total_width
-        
-        # If we need to scale down significantly, adjust font size
-        if scale_factor < 0.85:
-            # Calculate new font size (minimum 8pt)
-            new_font_size = max(8, int(font_size * scale_factor))
-            if new_font_size < font_size:
-                # Recalculate widths with smaller font
-                font_reduction_factor = new_font_size / font_size
-                col_widths = [w * font_reduction_factor if i >= 3 and i < total_cols - 1 else w 
-                             for i, w in enumerate(col_widths)]
-                actual_font_size = new_font_size
-                total_width = sum(col_widths)
-        
-        # Final scaling if still too wide
+        # Derive a smaller font size proportionally (floor, min 8 pt)
+        candidate_fs = max(8, int(font_size * available_width / total_width))
+
+        # Pass 2: re-measure EVERY column at the candidate font size so that
+        # all content — including Matric and Name — is sized correctly.
+        col_widths = _compute_col_widths(candidate_fs)
+        total_width = sum(col_widths)
+        actual_font_size = candidate_fs
+
+        # Minimal safety scale for any leftover rounding overage
         if total_width > available_width:
-            scale_factor = available_width / total_width
-            col_widths = [w * scale_factor for w in col_widths]
+            scale = available_width / total_width
+            col_widths = [w * scale for w in col_widths]
     
     # Convert Name (col 2) and Remarks (last col) data cells to Paragraphs for word-wrap
     styles = getSampleStyleSheet()
@@ -560,8 +553,8 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10,
         # All text black
         ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
         
-        # Header rows styling
-        ('FONTNAME', (0, 0), (-1, 3), 'Helvetica-Bold'),
+        # Header rows styling – plain (not bold)
+        ('FONTNAME', (0, 0), (-1, 3), 'Helvetica'),
         ('FONTSIZE', (0, 0), (2, 3), 8),  # Base columns
         ('FONTSIZE', (3, 0), (-1, 0), 11),  # Semester labels - larger
         ('FONTSIZE', (3, 1), (-1, 1), course_hdr_font_size),  # Course headers
