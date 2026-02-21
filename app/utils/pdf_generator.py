@@ -427,68 +427,73 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10):
         
         table_data.append(row)
     
-    # Calculate dynamic column widths
+    # ── Column width calculation ──────────────────────────────────────────────
+    # Each column is sized to its own content, with minimal cell padding.
+    # Vertical-text headers contribute to row height, not column width.
+    # Name and Remarks columns use Paragraph objects so they word-wrap.
+    # ─────────────────────────────────────────────────────────────────────────
+
+    # 2 pt total horizontal padding per cell (1 pt left + 1 pt right)
+    CELL_H_PAD = 2  # points
+
+    # Maximum width for the Remarks column – text wraps beyond this
+    REMARKS_MAX_WIDTH = 2.5 * cm
+
+    def _tw(text, bold=False, fsize=font_size):
+        """Measure text width in points."""
+        return stringWidth(str(text), 'Helvetica-Bold' if bold else 'Helvetica', fsize)
+
     col_widths = []
-    padding = 0.2*cm  # Reduced padding for better space utilization
-    
-    # --- Pass 1: compute the UNIFORM width for all course/summary columns ---
-    # We scan only the middle columns (index 3 to total_cols-2) and take the max
-    uniform_middle_width = 0.7*cm  # absolute minimum
-    for col_idx in range(3, total_cols - 1):
-        for row_idx, row in enumerate(table_data):
-            if col_idx < len(row):
-                cell_content = row[col_idx]
-                if isinstance(cell_content, VerticalText):
-                    cell_width = cell_content.fontSize + 0.15*cm
-                else:
-                    text = str(cell_content)
-                    cell_font_size = 8 if row_idx <= 3 else font_size
-                    lines = text.split('\n')
-                    max_line_width = max(
-                        [stringWidth(line, 'Helvetica-Bold' if row_idx <= 3 else 'Helvetica', cell_font_size)
-                         for line in lines] or [0]
-                    )
-                    cell_width = max_line_width + padding
-                uniform_middle_width = max(uniform_middle_width, cell_width)
-    
-    # --- Pass 2: assign widths – fixed columns get their own width,
-    #             all course/summary columns share the uniform width ---
+
     for col_idx in range(total_cols):
-        if col_idx == 0:  # S/N
-            # Calculate actual width for S/N (row numbers can vary)
-            sn_width = 0.7*cm
-            for row_idx, row in enumerate(table_data[4:], 4):  # data rows only
-                if 0 < len(row):
-                    text = str(row[0])
-                    w = stringWidth(text, 'Helvetica', font_size) + padding
-                    sn_width = max(sn_width, w)
-            col_widths.append(sn_width)
-        elif col_idx == 1:  # Matric Number
-            matric_width = 2.2*cm
-            for row_idx, row in enumerate(table_data[4:], 4):
-                if 1 < len(row):
-                    text = str(row[1])
-                    w = stringWidth(text, 'Helvetica', font_size) + padding
-                    matric_width = max(matric_width, w)
-            col_widths.append(matric_width)
-        elif col_idx == 2:  # Student Name
-            name_width = 3.5*cm
-            for row_idx, row in enumerate(table_data[4:], 4):
-                if 2 < len(row):
-                    text = str(row[2])
-                    w = stringWidth(text, 'Helvetica', font_size) + padding
-                    name_width = max(name_width, w)
-            col_widths.append(name_width)
-        elif col_idx == total_cols - 1:  # Remarks
-            remarks_width = 1.3*cm
-            for row_idx, row in enumerate(table_data[4:], 4):
-                if (total_cols - 1) < len(row):
-                    text = str(row[total_cols - 1])
-                    w = stringWidth(text, 'Helvetica', font_size) + padding
-                    remarks_width = max(remarks_width, w)
-            col_widths.append(remarks_width)
-        else:  # All course and summary columns – same uniform width
-            col_widths.append(uniform_middle_width)
+
+        if col_idx == 0:  # ── S/N ──────────────────────────────────────────
+            w = _tw('S/N', bold=True, fsize=8)
+            for row in table_data[4:]:
+                if col_idx < len(row):
+                    w = max(w, _tw(str(row[col_idx])))
+            col_widths.append(w + CELL_H_PAD)
+
+        elif col_idx == 1:  # ── Matric Number ─────────────────────────────
+            w = _tw('Matric Number', bold=True, fsize=8)
+            for row in table_data[4:]:
+                if col_idx < len(row):
+                    w = max(w, _tw(str(row[col_idx])))
+            col_widths.append(w + CELL_H_PAD)
+
+        elif col_idx == 2:  # ── Student Name ──────────────────────────────
+            # Header has two lines
+            w = max(_tw('Student Name', bold=True, fsize=8),
+                    _tw('(Surname First)', bold=True, fsize=8))
+            for row in table_data[4:]:
+                if col_idx < len(row):
+                    cell = row[col_idx]
+                    raw = cell if isinstance(cell, str) else str(cell)
+                    for line in raw.split('\n'):
+                        w = max(w, _tw(line))
+            col_widths.append(w + CELL_H_PAD)
+
+        elif col_idx == total_cols - 1:  # ── Remarks (capped / wrapping) ──
+            col_widths.append(REMARKS_MAX_WIDTH)
+
+        else:  # ── Course score or summary columns ─────────────────────────
+            # Width driven solely by DATA values; vertical headers go to height.
+            w = _tw('-')  # minimum: at least as wide as a dash
+            for row_idx, row in enumerate(table_data):
+                if col_idx >= len(row):
+                    continue
+                cell = row[col_idx]
+                if isinstance(cell, VerticalText):
+                    # Rotated header → contributes only to row height, not width.
+                    # Use the font-size as an absolute floor for the column.
+                    w = max(w, cell.fontSize)
+                elif row_idx < 4:
+                    # Non-vertical header cell (semester label, status, credit unit)
+                    w = max(w, _tw(str(cell), bold=True, fsize=8))
+                else:
+                    # Data row value (score like "80/A", CUF "0", GPA "4.50")
+                    w = max(w, _tw(str(cell)))
+            col_widths.append(w + CELL_H_PAD)
     
     # Adjust if total width exceeds page width
     available_width = page_size[0] - 1*cm
@@ -517,6 +522,20 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10):
             scale_factor = available_width / total_width
             col_widths = [w * scale_factor for w in col_widths]
     
+    # Convert Name (col 2) and Remarks (last col) data cells to Paragraphs for word-wrap
+    styles = getSampleStyleSheet()
+    _wrap_left = ParagraphStyle('CellWrapL', parent=styles['Normal'],
+        fontSize=actual_font_size, fontName='Helvetica',
+        leading=actual_font_size * 1.2, alignment=TA_LEFT, spaceAfter=0, spaceBefore=0)
+    _wrap_center = ParagraphStyle('CellWrapC', parent=styles['Normal'],
+        fontSize=actual_font_size, fontName='Helvetica',
+        leading=actual_font_size * 1.2, alignment=TA_CENTER, spaceAfter=0, spaceBefore=0)
+    for row in table_data[4:]:
+        if len(row) > 2 and not isinstance(row[2], Paragraph):
+            row[2] = Paragraph(str(row[2]), _wrap_left)
+        if len(row) >= total_cols and not isinstance(row[-1], Paragraph):
+            row[-1] = Paragraph(str(row[-1]), _wrap_center)
+
     # Create table
     table = Table(table_data, colWidths=col_widths, repeatRows=4)
     
@@ -547,6 +566,12 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10):
         ('FONTNAME', (0, 4), (-1, -1), 'Helvetica'),
         ('FONTSIZE', (0, 4), (-1, -1), actual_font_size),
         
+        # Tight cell padding (1pt each side)
+        ('LEFTPADDING', (0, 0), (-1, -1), 1),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 1),
+        ('TOPPADDING', (0, 0), (-1, -1), 1),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+
         # Grid - Black lines
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
         ('BOX', (0, 0), (-1, -1), 1.5, colors.black),
