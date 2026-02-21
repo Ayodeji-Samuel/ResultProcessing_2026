@@ -115,7 +115,8 @@ def create_header_styles():
     return styles
 
 
-def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10):
+def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10,
+                             course_hdr_font_size=10, page_margin=0.5):
     """
     Generate the examination record spreadsheet PDF.
     
@@ -132,24 +133,29 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10):
             - course_adviser: Name of course adviser
             - hod: Name of HOD
             - dean: Name of Dean
-        font_size: Base font size for data rows (minimum 10, default 10)
+        font_size: Font size for data rows (scores, GPA values). Min 8, default 10.
+        course_hdr_font_size: Font size for course title column headers and summary
+            label headers (the rotated vertical text). Default 10.
+        page_margin: Page margin on each side in cm. Default 0.5 (= 5 mm).
     
     Returns:
         BytesIO: PDF file buffer
     """
-    # Ensure font size is at least 10
-    font_size = max(10, font_size)
+    # Enforce minimums
+    font_size = max(8, font_size)
+    course_hdr_font_size = max(7, course_hdr_font_size)
     buffer = BytesIO()
     
     # Use landscape orientation for wide spreadsheets
     page_size = landscape(A4)
+    _margin = page_margin * cm
     doc = SimpleDocTemplate(
         buffer,
         pagesize=page_size,
-        leftMargin=0.5*cm,
-        rightMargin=0.5*cm,
-        topMargin=0.5*cm,
-        bottomMargin=0.5*cm
+        leftMargin=_margin,
+        rightMargin=_margin,
+        topMargin=_margin,
+        bottomMargin=_margin
     )
     
     styles = create_header_styles()
@@ -268,17 +274,17 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10):
         # Add first semester courses to rows 2, 3, 4
         for course in first_sem_courses:
             course_text = f"{course['code']}: {course['title'][:20]}"
-            text_length = stringWidth(course_text, 'Helvetica-Bold', 8)
+            text_length = stringWidth(course_text, 'Helvetica-Bold', course_hdr_font_size)
             max_course_text_length = max(max_course_text_length, text_length)
             
-            row2.append(VerticalText(course_text))
+            row2.append(VerticalText(course_text, fontSize=course_hdr_font_size))
             row3.append(course['status'])
             row4.append(str(course['credit_unit']))
         
         # Add first semester summary columns
         first_sem_summary_labels = ['Total Credit Unit Failed', 'Total Credit Unit Passed', 'Total Credit Unit', 'GPA']
         for label in first_sem_summary_labels:
-            row2.append(VerticalText(label))
+            row2.append(VerticalText(label, fontSize=course_hdr_font_size))
         row3.extend(['', '', '', ''])
         row4.extend(['', '', '', ''])
         
@@ -290,17 +296,17 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10):
         # Add second semester courses to rows 2, 3, 4
         for course in second_sem_courses:
             course_text = f"{course['code']}: {course['title'][:20]}"
-            text_length = stringWidth(course_text, 'Helvetica-Bold', 8)
+            text_length = stringWidth(course_text, 'Helvetica-Bold', course_hdr_font_size)
             max_course_text_length = max(max_course_text_length, text_length)
             
-            row2.append(VerticalText(course_text))
+            row2.append(VerticalText(course_text, fontSize=course_hdr_font_size))
             row3.append(course['status'])
             row4.append(str(course['credit_unit']))
         
         # Add second semester summary columns
         second_sem_summary_labels = ['Total Credit Unit Failed', 'Total Credit Unit Passed', 'Total Credit Unit', 'GPA']
         for label in second_sem_summary_labels:
-            row2.append(VerticalText(label))
+            row2.append(VerticalText(label, fontSize=course_hdr_font_size))
         row3.extend(['', '', '', ''])
         row4.extend(['', '', '', ''])
         
@@ -308,7 +314,7 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10):
         session_summary_labels = ['Total Credit Unit Failed Session', 'Total Credit Unit Passed Session', 'Total Credit Unit Session', 'CGPA']
         for label in session_summary_labels:
             row1.append('')  # No spanning for session summary in row1
-            row2.append(VerticalText(label))
+            row2.append(VerticalText(label, fontSize=course_hdr_font_size))
         row3.extend(['', '', '', ''])
         row4.extend(['', '', '', ''])
         
@@ -326,17 +332,17 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10):
         # Add courses to headers
         for course in courses_to_show:
             course_text = f"{course['code']}: {course['title'][:20]}"
-            text_length = stringWidth(course_text, 'Helvetica-Bold', 8)
+            text_length = stringWidth(course_text, 'Helvetica-Bold', course_hdr_font_size)
             max_course_text_length = max(max_course_text_length, text_length)
             
-            row2.append(VerticalText(course_text))
+            row2.append(VerticalText(course_text, fontSize=course_hdr_font_size))
             row3.append(course['status'])
             row4.append(str(course['credit_unit']))
         
         # Add summary column headers
         summary_labels = ['Total Credit Unit Failed', 'Total Credit Unit Passed', 'Total Credit Unit', 'GPA']
         for label in summary_labels:
-            row2.append(VerticalText(label))
+            row2.append(VerticalText(label, fontSize=course_hdr_font_size))
         row3.extend(['', '', '', ''])
         row4.extend(['', '', '', ''])
         
@@ -498,7 +504,7 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10):
             col_widths.append(w + CELL_H_PAD)
     
     # Adjust if total width exceeds page width
-    available_width = page_size[0] - 1*cm
+    available_width = page_size[0] - 2 * _margin
     total_width = sum(col_widths)
     
     # Calculate dynamic font size if content is too wide
@@ -558,8 +564,8 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10):
         ('FONTNAME', (0, 0), (-1, 3), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (2, 3), 8),  # Base columns
         ('FONTSIZE', (3, 0), (-1, 0), 11),  # Semester labels - larger
-        ('FONTSIZE', (3, 1), (-1, 1), 7),  # Course headers - smaller for better fit
-        ('FONTSIZE', (3, 2), (-1, 3), 7),  # Status and credit units - smaller
+        ('FONTSIZE', (3, 1), (-1, 1), course_hdr_font_size),  # Course headers
+        ('FONTSIZE', (3, 2), (-1, 3), max(7, course_hdr_font_size - 1)),  # Status and credit units
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, 3), 'BOTTOM'),  # Header rows - bottom alignment
         ('VALIGN', (0, 4), (-1, -1), 'MIDDLE'),  # Data rows - middle alignment

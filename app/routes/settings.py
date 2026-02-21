@@ -147,7 +147,10 @@ def system():
 @admin_or_hod_required
 def update_system():
     """Update system settings"""
-    keys = ['university_name', 'faculty_name', 'department_name']
+    keys = [
+        'university_name', 'faculty_name', 'department_name',
+        'pdf_data_font_size', 'pdf_course_hdr_font_size', 'pdf_page_margin',
+    ]
     
     for key in keys:
         value = request.form.get(key, '').strip()

@@ -256,11 +256,34 @@ def spreadsheet():
                 'dean': dean_name
             }
             
-            # Get font size from form (default 10, minimum 10)
-            font_size = request.form.get('font_size', type=int, default=10)
-            font_size = max(10, font_size)  # Ensure minimum of 10
-            
-            pdf_buffer = generate_spreadsheet_pdf(data, config, signatories, font_size=font_size)
+            # ── PDF appearance: read from DB settings, then allow form override ──
+            from app.models import SystemSetting
+            pdf_settings = {s.key: s.value for s in SystemSetting.query.filter(
+                SystemSetting.key.in_(['pdf_data_font_size', 'pdf_course_hdr_font_size', 'pdf_page_margin'])
+            ).all()}
+
+            # Data row font size (scores like "80A", GPA values)
+            db_data_fs = int(pdf_settings.get('pdf_data_font_size') or 10)
+            font_size = request.form.get('font_size', type=int, default=db_data_fs)
+            font_size = max(8, font_size)
+
+            # Course header font size (rotated vertical text)
+            db_hdr_fs = int(pdf_settings.get('pdf_course_hdr_font_size') or 10)
+            course_hdr_font_size = request.form.get('course_hdr_font_size', type=int, default=db_hdr_fs)
+            course_hdr_font_size = max(7, course_hdr_font_size)
+
+            # Page margin (cm)
+            margin_map = {'narrow': 0.3, 'normal': 0.5, 'wide': 1.0}
+            db_margin_key = pdf_settings.get('pdf_page_margin', 'normal')
+            db_margin = margin_map.get(db_margin_key, 0.5)
+            page_margin = float(request.form.get('page_margin', db_margin))
+
+            pdf_buffer = generate_spreadsheet_pdf(
+                data, config, signatories,
+                font_size=font_size,
+                course_hdr_font_size=course_hdr_font_size,
+                page_margin=page_margin,
+            )
             
             filename = f"results_{program.replace(' ', '_')}_{level}_{semester}_{current_session.session_name.replace('/', '-')}.pdf"
             
@@ -408,16 +431,23 @@ def spreadsheet():
                                            'department_name': Config.DEPARTMENT_NAME
                                        })
     
+    # Load PDF appearance defaults from DB settings for the form
+    from app.models import SystemSetting
+    _pdf_ks = ['pdf_data_font_size', 'pdf_course_hdr_font_size', 'pdf_page_margin']
+    pdf_defaults = {s.key: s.value for s in SystemSetting.query.filter(
+        SystemSetting.key.in_(_pdf_ks)).all()}
+
     # Get all academic sessions for dropdown
     sessions = AcademicSession.query.order_by(AcademicSession.session_name.desc()).all()
-    
+
     return render_template('reports/spreadsheet.html',
                            current_session=current_session,
                            sessions=sessions,
                            levels=Config.LEVELS,
                            programs=Config.PROGRAMS,
                            level_access=level_access,
-                           program_access=program_access)
+                           program_access=program_access,
+                           pdf_defaults=pdf_defaults)
 
 
 @reports_bp.route('/student/<int:student_id>')

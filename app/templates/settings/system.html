@@ -94,6 +94,63 @@
                             </div>
                         </div>
                     </div>
+
+                    <p class="text-muted small mb-3">
+                        <i class="bi bi-info-circle"></i>
+                        These defaults apply whenever a spreadsheet is generated. They can be overridden on the
+                        <a href="{{ url_for('reports.spreadsheet') }}">Generate Spreadsheet</a> page.
+                    </p>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label for="pdf_data_font_size" class="form-label">
+                                Data Cell Font Size
+                                <span class="text-muted fw-normal">(pt)</span>
+                            </label>
+                            <input type="number" class="form-control" id="pdf_data_font_size"
+                                   name="pdf_data_font_size" min="8" max="16" step="1"
+                                   value="{{ settings.pdf_data_font_size or 10 }}">
+                            <div class="form-text">
+                                Font size for score values (e.g.&nbsp;<kbd>80A</kbd>), GPA, and summary
+                                numbers. Min&nbsp;8&thinsp;pt, default&nbsp;10&thinsp;pt.
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="pdf_course_hdr_font_size" class="form-label">
+                                Course Header Font Size
+                                <span class="text-muted fw-normal">(pt)</span>
+                            </label>
+                            <input type="number" class="form-control" id="pdf_course_hdr_font_size"
+                                   name="pdf_course_hdr_font_size" min="7" max="14" step="1"
+                                   value="{{ settings.pdf_course_hdr_font_size or 10 }}">
+                            <div class="form-text">
+                                Font size for the rotated course-title column headers and summary
+                                labels. Min&nbsp;7&thinsp;pt, default&nbsp;10&thinsp;pt.
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="pdf_page_margin" class="form-label">Page Margins</label>
+                            <select class="form-select" id="pdf_page_margin" name="pdf_page_margin">
+                                <option value="narrow"
+                                    {{ 'selected' if settings.pdf_page_margin == 'narrow' }}>
+                                    Narrow (3&thinsp;mm) — more columns fit
+                                </option>
+                                <option value="normal"
+                                    {{ 'selected' if (not settings.pdf_page_margin or settings.pdf_page_margin == 'normal') }}>
+                                    Normal (5&thinsp;mm) — default
+                                </option>
+                                <option value="wide"
+                                    {{ 'selected' if settings.pdf_page_margin == 'wide' }}>
+                                    Wide (10&thinsp;mm) — more whitespace
+                                </option>
+                            </select>
+                            <div class="form-text">
+                                Margin on all four sides of the A4 landscape page.
+                            </div>
+                        </div>
+                    </div>
                     
                     <hr class="my-4">
                     
