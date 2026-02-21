@@ -262,6 +262,8 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10):
     if show_combined:
         # FIRST SEMESTER SECTION
         row1.append('FIRST SEMESTER')  # This will span first semester courses + summary
+        # Pad row1 so 'SECOND SEMESTER' lands at the correct column index
+        row1.extend([''] * (first_sem_course_cols + first_sem_summary_cols - 1))
         
         # Add first semester courses to rows 2, 3, 4
         for course in first_sem_courses:
@@ -282,6 +284,8 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10):
         
         # SECOND SEMESTER SECTION
         row1.append('SECOND SEMESTER')  # This will span second semester courses + summary
+        # Pad row1 so session summary labels land at the correct column indexes
+        row1.extend([''] * (second_sem_course_cols + second_sem_summary_cols - 1))
         
         # Add second semester courses to rows 2, 3, 4
         for course in second_sem_courses:
@@ -423,52 +427,68 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10):
         
         table_data.append(row)
     
-    # Calculate dynamic column widths based on content
+    # Calculate dynamic column widths
     col_widths = []
     padding = 0.2*cm  # Reduced padding for better space utilization
     
-    # Calculate width for each column
-    for col_idx in range(total_cols):
-        max_width = 0
-        
-        # Check all rows for this column
+    # --- Pass 1: compute the UNIFORM width for all course/summary columns ---
+    # We scan only the middle columns (index 3 to total_cols-2) and take the max
+    uniform_middle_width = 0.7*cm  # absolute minimum
+    for col_idx in range(3, total_cols - 1):
         for row_idx, row in enumerate(table_data):
             if col_idx < len(row):
                 cell_content = row[col_idx]
-                
-                # Handle VerticalText objects
                 if isinstance(cell_content, VerticalText):
-                    # For vertical text, width is just the font size + minimal padding
                     cell_width = cell_content.fontSize + 0.15*cm
                 else:
-                    # For regular text, calculate based on string width
                     text = str(cell_content)
-                    # Use appropriate font size based on row
-                    if row_idx <= 3:  # Header rows
-                        cell_font_size = 8
-                    else:  # Data rows - use the configurable font size
-                        cell_font_size = font_size
-                    
-                    # Calculate width for multi-line text (take max line width)
+                    cell_font_size = 8 if row_idx <= 3 else font_size
                     lines = text.split('\n')
-                    max_line_width = max([stringWidth(line, 'Helvetica-Bold' if row_idx <= 3 else 'Helvetica', cell_font_size) for line in lines] or [0])
+                    max_line_width = max(
+                        [stringWidth(line, 'Helvetica-Bold' if row_idx <= 3 else 'Helvetica', cell_font_size)
+                         for line in lines] or [0]
+                    )
                     cell_width = max_line_width + padding
-                
-                max_width = max(max_width, cell_width)
-        
-        # Set minimum widths for specific columns
+                uniform_middle_width = max(uniform_middle_width, cell_width)
+    
+    # --- Pass 2: assign widths – fixed columns get their own width,
+    #             all course/summary columns share the uniform width ---
+    for col_idx in range(total_cols):
         if col_idx == 0:  # S/N
-            max_width = max(max_width, 0.7*cm)
-        elif col_idx == 1:  # Matric
-            max_width = max(max_width, 2.2*cm)
-        elif col_idx == 2:  # Name
-            max_width = max(max_width, 3.5*cm)
+            # Calculate actual width for S/N (row numbers can vary)
+            sn_width = 0.7*cm
+            for row_idx, row in enumerate(table_data[4:], 4):  # data rows only
+                if 0 < len(row):
+                    text = str(row[0])
+                    w = stringWidth(text, 'Helvetica', font_size) + padding
+                    sn_width = max(sn_width, w)
+            col_widths.append(sn_width)
+        elif col_idx == 1:  # Matric Number
+            matric_width = 2.2*cm
+            for row_idx, row in enumerate(table_data[4:], 4):
+                if 1 < len(row):
+                    text = str(row[1])
+                    w = stringWidth(text, 'Helvetica', font_size) + padding
+                    matric_width = max(matric_width, w)
+            col_widths.append(matric_width)
+        elif col_idx == 2:  # Student Name
+            name_width = 3.5*cm
+            for row_idx, row in enumerate(table_data[4:], 4):
+                if 2 < len(row):
+                    text = str(row[2])
+                    w = stringWidth(text, 'Helvetica', font_size) + padding
+                    name_width = max(name_width, w)
+            col_widths.append(name_width)
         elif col_idx == total_cols - 1:  # Remarks
-            max_width = max(max_width, 1.3*cm)
-        else:  # Course and summary columns - use content-based width
-            max_width = max(max_width, 0.6*cm)  # Minimum width for course columns
-        
-        col_widths.append(max_width)
+            remarks_width = 1.3*cm
+            for row_idx, row in enumerate(table_data[4:], 4):
+                if (total_cols - 1) < len(row):
+                    text = str(row[total_cols - 1])
+                    w = stringWidth(text, 'Helvetica', font_size) + padding
+                    remarks_width = max(remarks_width, w)
+            col_widths.append(remarks_width)
+        else:  # All course and summary columns – same uniform width
+            col_widths.append(uniform_middle_width)
     
     # Adjust if total width exceeds page width
     available_width = page_size[0] - 1*cm

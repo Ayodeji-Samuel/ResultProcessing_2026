@@ -21,6 +21,9 @@ Werkzeug>=2.3.0
 # PDF generation
 reportlab>=4.0.0
 
+# PDF reading / data extraction (for past result uploads)
+pdfplumber>=0.10.0
+
 # CSV handling (built-in, but explicit)
 # csv is part of Python standard library
 

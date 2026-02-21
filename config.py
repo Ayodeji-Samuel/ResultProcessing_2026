@@ -14,7 +14,23 @@ class Config:
     LOGO_FOLDER = os.path.join(basedir, 'app', 'static', 'logos')
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
     ALLOWED_EXTENSIONS = {'csv'}
+    ALLOWED_PAST_RESULT_EXTENSIONS = {'csv', 'pdf'}  # PDF allowed for past results upload
     ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+    
+    # Matric Number Formats (Edo State University Iyamho)
+    # FSC/CSC/xxxxxxxx  - Computer Science
+    # FSC/CBS/xxxxxxxx  - Cybersecurity
+    # FSC/SWE/xxxxxxxx  - Software Engineering
+    # FSC/CSC/CV/xxxxxxxx - Conversion students (Computer Science)
+    # FSC/CBS/CV/xxxxxxxx - Conversion students (Cybersecurity)
+    # FSC/SWE/CV/xxxxxxxx - Conversion students (Software Engineering)
+    # xxxxxxxxxx (10+ digit) - JAMB Registration Number (for new students without matric)
+    MATRIC_PREFIXES = {
+        'Computer Science': 'FSC/CSC/',
+        'Cyber Security': 'FSC/CBS/',
+        'Software Engineering': 'FSC/SWE/',
+    }
+    MATRIC_CONVERSION_SUFFIX = 'CV/'  # e.g. FSC/CSC/CV/xxxxxxxx
     
     # Session configuration
     PERMANENT_SESSION_LIFETIME = timedelta(hours=2)

@@ -1,11 +1,14 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, Response, jsonify
 from flask_login import login_required, current_user
+from datetime import datetime
 from app import db
 from app.models import Student, Course, Result, AcademicSession, UploadLog, Carryover
 from app.utils import (
     parse_results_csv, generate_sample_results_csv, allowed_file,
     get_grade_info, format_score_grade, process_carryovers_for_student,
-    check_and_clear_carryovers, get_accessible_filters
+    check_and_clear_carryovers, get_accessible_filters,
+    extract_results_from_pdf, parse_past_results_csv,
+    generate_sample_past_results_csv
 )
 from app.routes.auth import log_result_alteration
 from config import Config
@@ -958,3 +961,329 @@ def final_approve_course(course_id):
     flash(f'Final approval given for {course.course_code}. Course results are now officially approved.', 'success')
     return redirect(url_for('results.view_course', course_id=course_id))
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Past / Backlog Results Upload
+# ─────────────────────────────────────────────────────────────────────────────
+
+@results_bp.route('/upload-past', methods=['GET', 'POST'])
+@login_required
+def upload_past():
+    """
+    Upload backlog / past exam result records for any session+semester.
+    Supports CSV files and PDF score-sheets.
+    Accessible to HoD and Admin only.
+    """
+    if not (current_user.is_hod() or current_user.is_admin()):
+        flash('Only HoD or Admin can upload past result records.', 'danger')
+        return redirect(url_for('results.index'))
+
+    all_sessions = AcademicSession.query.order_by(
+        AcademicSession.session_name.desc()
+    ).all()
+
+    level_access, program_access = get_accessible_filters()
+
+    available_courses = Course.query.filter_by(is_active=True).order_by(
+        Course.level, Course.semester, Course.course_code
+    ).all()
+
+    if request.method == 'POST':
+        session_id = request.form.get('session_id', type=int)
+        new_session_name = request.form.get('new_session_name', '').strip()
+        semester = request.form.get('semester', type=int)
+        course_id = request.form.get('course_id', type=int)
+        create_missing = request.form.get('create_missing') == 'on'
+        file = request.files.get('file')
+
+        # ── resolve / create session ──────────────────────────────────────────
+        if new_session_name:
+            # Create new session if it doesn't exist
+            session_obj = AcademicSession.query.filter_by(
+                session_name=new_session_name
+            ).first()
+            if not session_obj:
+                session_obj = AcademicSession(session_name=new_session_name)
+                db.session.add(session_obj)
+                db.session.flush()  # get id
+                flash(f'New academic session "{new_session_name}" created.', 'info')
+        elif session_id:
+            session_obj = AcademicSession.query.get(session_id)
+        else:
+            flash('Please select an academic session or enter a new one.', 'danger')
+            return redirect(url_for('results.upload_past'))
+
+        if not session_obj:
+            flash('Session not found.', 'danger')
+            return redirect(url_for('results.upload_past'))
+
+        # ── validate other inputs ─────────────────────────────────────────────
+        if not semester or semester not in [1, 2]:
+            flash('Please select a valid semester (1 or 2).', 'danger')
+            return redirect(url_for('results.upload_past'))
+
+        if not course_id:
+            flash('Please select a course.', 'danger')
+            return redirect(url_for('results.upload_past'))
+
+        course = Course.query.get_or_404(course_id)
+
+        if not file or file.filename == '':
+            flash('Please select a file to upload.', 'danger')
+            return redirect(url_for('results.upload_past'))
+
+        filename_lower = file.filename.lower()
+        is_pdf = filename_lower.endswith('.pdf')
+        is_csv = filename_lower.endswith('.csv')
+
+        if not is_pdf and not is_csv:
+            flash('Only CSV and PDF files are supported.', 'danger')
+            return redirect(url_for('results.upload_past'))
+
+        # ── parse file ────────────────────────────────────────────────────────
+        file_content = file.read()
+
+        if is_pdf:
+            raw_records, parse_errors = extract_results_from_pdf(file_content)
+        else:
+            raw_records, parse_errors = parse_past_results_csv(file_content)
+
+        if not raw_records:
+            err_text = '; '.join(parse_errors) if parse_errors else 'No records found.'
+            flash(f'Could not extract any records: {err_text}', 'danger')
+            return redirect(url_for('results.upload_past'))
+
+        degree_type = course.degree_type or 'BSc'
+        added = 0
+        updated = 0
+        failed = 0
+        not_found_matrics = []
+        created_students = []
+        process_errors = list(parse_errors)  # carry over parse warnings
+
+        for record in raw_records:
+            try:
+                matric = record['matric_number']
+
+                # ── find student ───────────────────────────────────────────────
+                # First look in the target session
+                student = Student.query.filter_by(
+                    matric_number=matric,
+                    session_id=session_obj.id
+                ).first()
+
+                if not student and create_missing:
+                    # Look for the student in any other session
+                    existing_any = Student.query.filter_by(
+                        matric_number=matric
+                    ).order_by(Student.created_at.desc()).first()
+
+                    if existing_any:
+                        # Clone the record into the target session
+                        student = Student(
+                            matric_number=matric,
+                            surname=existing_any.surname,
+                            first_name=existing_any.first_name,
+                            other_names=existing_any.other_names,
+                            gender=existing_any.gender,
+                            program=existing_any.program,
+                            level=existing_any.level,
+                            session_id=session_obj.id
+                        )
+                        db.session.add(student)
+                        db.session.flush()
+                        created_students.append(matric)
+                    elif record.get('name'):
+                        # Create a minimal student record from CSV name
+                        name_parts = record['name'].split()
+                        surname = name_parts[0].upper() if name_parts else matric
+                        first_name = name_parts[1].title() if len(name_parts) > 1 else 'Unknown'
+                        other_names = ' '.join(name_parts[2:]).title() if len(name_parts) > 2 else None
+
+                        student = Student(
+                            matric_number=matric,
+                            surname=surname,
+                            first_name=first_name,
+                            other_names=other_names,
+                            program=course.program,
+                            level=course.level,
+                            session_id=session_obj.id
+                        )
+                        db.session.add(student)
+                        db.session.flush()
+                        created_students.append(matric)
+
+                if not student:
+                    not_found_matrics.append(matric)
+                    failed += 1
+                    continue
+
+                # ── calculate grade ────────────────────────────────────────────
+                ca_score = record['ca_score']
+                exam_score = record['exam_score']
+                total_score = record['total_score']
+                grade, grade_point = get_grade_info(total_score, degree_type)
+
+                is_carryover = Carryover.query.filter_by(
+                    student_matric=matric,
+                    course_id=course.id,
+                    is_cleared=False
+                ).first() is not None
+
+                # ── upsert result ──────────────────────────────────────────────
+                existing = Result.query.filter_by(
+                    student_id=student.id,
+                    course_id=course.id,
+                    session_id=session_obj.id
+                ).first()
+
+                if existing:
+                    old_ca, old_exam = existing.ca_score, existing.exam_score
+                    old_total, old_grade = existing.total_score, existing.grade
+
+                    existing.ca_score = ca_score
+                    existing.exam_score = exam_score
+                    existing.total_score = total_score
+                    existing.grade = grade
+                    existing.grade_point = grade_point
+                    existing.is_carryover = is_carryover
+                    existing.uploaded_by = current_user.id
+                    result_id = existing.id
+
+                    if (old_ca != ca_score or old_exam != exam_score or
+                            old_total != total_score or old_grade != grade):
+                        from types import SimpleNamespace
+                        log_result_alteration(
+                            result_id=result_id,
+                            student=student,
+                            course=course,
+                            session_name=session_obj.session_name,
+                            alteration_type='UPDATE',
+                            old_result=SimpleNamespace(
+                                ca_score=old_ca, exam_score=old_exam,
+                                total_score=old_total, grade=old_grade),
+                            new_result=SimpleNamespace(
+                                ca_score=ca_score, exam_score=exam_score,
+                                total_score=total_score, grade=grade),
+                            reason='Past result upload (backlog)'
+                        )
+                    updated += 1
+
+                else:
+                    new_result = Result(
+                        student_id=student.id,
+                        course_id=course.id,
+                        session_id=session_obj.id,
+                        ca_score=ca_score,
+                        exam_score=exam_score,
+                        total_score=total_score,
+                        grade=grade,
+                        grade_point=grade_point,
+                        is_carryover=is_carryover,
+                        uploaded_by=current_user.id
+                    )
+                    db.session.add(new_result)
+                    db.session.flush()
+                    result_id = new_result.id
+
+                    from types import SimpleNamespace
+                    log_result_alteration(
+                        result_id=result_id,
+                        student=student,
+                        course=course,
+                        session_name=session_obj.session_name,
+                        alteration_type='CREATE',
+                        old_result=None,
+                        new_result=SimpleNamespace(
+                            ca_score=ca_score, exam_score=exam_score,
+                            total_score=total_score, grade=grade),
+                        reason='Past result upload (backlog)'
+                    )
+                    added += 1
+
+                # ── handle carryover clearing ──────────────────────────────────
+                if grade != 'F' and is_carryover:
+                    check_and_clear_carryovers(
+                        matric, course.id, session_obj.id, result_id, db
+                    )
+
+            except Exception as exc:
+                failed += 1
+                process_errors.append(f"{record.get('matric_number', '?')}: {exc}")
+
+        db.session.commit()
+
+        # Process carryovers for newly-uploaded results
+        processed_matrics = set()
+        for record in raw_records:
+            m = record['matric_number']
+            if m not in processed_matrics and m not in not_found_matrics:
+                process_carryovers_for_student(m, session_obj.id, db)
+                processed_matrics.add(m)
+
+        # ── log upload ─────────────────────────────────────────────────────────
+        log = UploadLog(
+            user_id=current_user.id,
+            upload_type='past_results',
+            filename=f"{course.course_code}_{session_obj.session_name}_{file.filename}",
+            records_processed=added + updated,
+            records_failed=failed,
+            status='success' if failed == 0 else 'partial',
+            error_message='; '.join(process_errors) if process_errors else None
+        )
+        db.session.add(log)
+        db.session.commit()
+
+        # ── flash summary ──────────────────────────────────────────────────────
+        flash(
+            f'Past results uploaded for {course.course_code} '
+            f'({session_obj.session_name}, Semester {semester}): '
+            f'{added} added, {updated} updated, {failed} failed.',
+            'success' if failed == 0 else 'warning'
+        )
+        if created_students:
+            flash(
+                f'{len(created_students)} student record(s) auto-created: '
+                + ', '.join(created_students[:10])
+                + ('...' if len(created_students) > 10 else ''),
+                'info'
+            )
+        if not_found_matrics:
+            flash(
+                f'Students not found (enable "Create missing students" or add them first): '
+                + ', '.join(not_found_matrics[:10])
+                + ('...' if len(not_found_matrics) > 10 else ''),
+                'warning'
+            )
+        if process_errors:
+            flash(
+                f'Warnings / errors: '
+                + '; '.join(process_errors[:5])
+                + ('...' if len(process_errors) > 5 else ''),
+                'warning'
+            )
+
+        return redirect(url_for('results.view_course', course_id=course_id))
+
+    return render_template(
+        'results/upload_past.html',
+        all_sessions=all_sessions,
+        available_courses=available_courses,
+        levels=Config.LEVELS,
+        programs=Config.PROGRAMS,
+        semesters=Config.SEMESTERS,
+        level_access=level_access,
+        program_access=program_access
+    )
+
+
+@results_bp.route('/sample-past-csv')
+@login_required
+def sample_past_csv():
+    """Download sample past results CSV template."""
+    csv_content = generate_sample_past_results_csv()
+    return Response(
+        csv_content,
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=sample_past_results.csv'}
+    )

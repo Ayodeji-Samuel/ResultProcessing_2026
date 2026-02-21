@@ -94,7 +94,7 @@ class Student(db.Model):
     __tablename__ = 'students'
     
     id = db.Column(db.Integer, primary_key=True)
-    matric_number = db.Column(db.String(20), nullable=False, index=True)
+    matric_number = db.Column(db.String(30), nullable=False, index=True)
     surname = db.Column(db.String(64), nullable=False)
     first_name = db.Column(db.String(64), nullable=False)
     other_names = db.Column(db.String(64))
@@ -261,7 +261,7 @@ class Carryover(db.Model):
     __tablename__ = 'carryovers'
     
     id = db.Column(db.Integer, primary_key=True)
-    student_matric = db.Column(db.String(20), nullable=False, index=True)  # Track by matric (persists across sessions)
+    student_matric = db.Column(db.String(30), nullable=False, index=True)  # Track by matric (persists across sessions)
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
     original_session_id = db.Column(db.Integer, db.ForeignKey('academic_sessions.id'), nullable=False)  # When failed
     original_level = db.Column(db.Integer, nullable=False)  # Level when failed
@@ -291,7 +291,7 @@ class StudentAcademicHistory(db.Model):
     __tablename__ = 'student_academic_history'
     
     id = db.Column(db.Integer, primary_key=True)
-    student_matric = db.Column(db.String(20), nullable=False, index=True)
+    student_matric = db.Column(db.String(30), nullable=False, index=True)
     session_id = db.Column(db.Integer, db.ForeignKey('academic_sessions.id'), nullable=False)
     level = db.Column(db.Integer, nullable=False)
     program = db.Column(db.String(64), nullable=False)
@@ -374,7 +374,7 @@ class ResultAlteration(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     result_id = db.Column(db.Integer, db.ForeignKey('results.id'), nullable=False)
-    student_matric = db.Column(db.String(20), nullable=False, index=True)
+    student_matric = db.Column(db.String(30), nullable=False, index=True)
     student_name = db.Column(db.String(256))
     course_code = db.Column(db.String(10), nullable=False)
     course_title = db.Column(db.String(128))

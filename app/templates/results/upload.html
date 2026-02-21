@@ -138,6 +138,24 @@
                 Students must already exist in the system for the same level and program as the selected course.
             </p>
         </div>
+
+        <!-- Past Results Upload Link -->
+        {% if current_user.is_hod() or current_user.is_admin() %}
+        <div class="bg-amber-50 border-2 border-amber-200 rounded-xl p-6">
+            <h3 class="text-lg font-semibold text-amber-900 mb-3 flex items-center">
+                <i class="ri-history-line mr-2"></i>
+                Backlog / Past Results?
+            </h3>
+            <p class="text-sm text-amber-800 mb-3">
+                Need to upload results from a <strong>previous session</strong> or from a
+                <strong>PDF score-sheet</strong>?  Use the dedicated past results upload.
+            </p>
+            <a href="{{ url_for('results.upload_past') }}"
+               class="block w-full px-4 py-2 bg-amber-500 text-white text-center rounded-lg hover:bg-amber-600 transition-colors font-medium">
+                <i class="ri-upload-cloud-line mr-2"></i>Upload Past Results
+            </a>
+        </div>
+        {% endif %}
         
         <!-- Grading System -->
         <div class="bg-white rounded-xl shadow-sm p-6">

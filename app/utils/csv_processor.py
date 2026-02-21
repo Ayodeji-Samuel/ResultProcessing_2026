@@ -193,26 +193,39 @@ def parse_results_csv(file_content):
 def generate_sample_student_csv():
     """
     Generate a sample student CSV file content.
+    Matric number formats for Edo State University Iyamho:
+      - FSC/CSC/xxxxxxxx  (Computer Science)
+      - FSC/CBS/xxxxxxxx  (Cybersecurity)
+      - FSC/SWE/xxxxxxxx  (Software Engineering)
+      - FSC/CSC/CV/xxxxxxxx (Conversion - Computer Science)
+      - JAMB registration number (new students without matric)
     
     Returns:
         str: Sample CSV content
     """
     content = "Matric Number,Surname,First Name,Other Names,Gender\n"
-    content += "CSC/2023/001,ADEYEMI,John,Oluwaseun,M\n"
-    content += "CSC/2023/002,OKONKWO,Mary,Chidinma,F\n"
-    content += "CSC/2023/003,IBRAHIM,Ahmed,Musa,M\n"
+    content += "FSC/CSC/24001,ADEYEMI,John,Oluwaseun,M\n"
+    content += "FSC/CBS/24002,OKONKWO,Mary,Chidinma,F\n"
+    content += "FSC/SWE/24003,IBRAHIM,Ahmed,Musa,M\n"
+    content += "FSC/CSC/CV/23001,OSAGIE,Grace,,F\n"
+    content += "2024123456AB,EKHATOR,Peter,Osahon,M\n"  # JAMB reg (no matric yet)
     return content
 
 
 def generate_sample_results_csv():
     """
     Generate a sample results CSV file content.
+    Matric number formats:
+      FSC/CSC/xxxxxxxx, FSC/CBS/xxxxxxxx, FSC/SWE/xxxxxxxx,
+      FSC/CSC/CV/xxxxxxxx, or JAMB registration number.
     
     Returns:
         str: Sample CSV content
     """
     content = "Matric Number,CA Score,Exam Score\n"
-    content += "CSC/2023/001,25,50\n"
-    content += "CSC/2023/002,28,55\n"
-    content += "CSC/2023/003,20,45\n"
+    content += "FSC/CSC/24001,25,50\n"
+    content += "FSC/CBS/24002,28,55\n"
+    content += "FSC/SWE/24003,20,45\n"
+    content += "FSC/CSC/CV/23001,22,48\n"
+    content += "2024123456AB,18,40\n"  # Student using JAMB reg number
     return content

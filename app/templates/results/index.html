@@ -22,6 +22,12 @@
                 <i class="ri-upload-cloud-line mr-2"></i>
                 Upload Results
             </a>
+            {% if current_user.is_hod() or current_user.is_admin() %}
+            <a href="{{ url_for('results.upload_past') }}" class="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors flex items-center">
+                <i class="ri-history-line mr-2"></i>
+                Past Results
+            </a>
+            {% endif %}
             <a href="{{ url_for('courses.index') }}" class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center">
                 <i class="ri-file-add-line mr-2"></i>
                 Manual Entry
