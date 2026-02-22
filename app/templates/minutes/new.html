@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% block title %}New Meeting – EDSU Minutes{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* pulse animation for recording indicator */
+  @keyframes pulse-ring {
+    0%   { transform: scale(.8); opacity:1; }
+    80%,100% { transform: scale(2); opacity:0; }
+  }
+  .pulse-ring { animation: pulse-ring 1.4s cubic-bezier(0.215,0.61,0.355,1) infinite; }
+  .wave-bar   { display:inline-block; width:4px; border-radius:2px;
+                background:#0284c7; animation: wave 1s ease-in-out infinite; }
+  .wave-bar:nth-child(2){ animation-delay:.1s; }
+  .wave-bar:nth-child(3){ animation-delay:.2s; }
+  .wave-bar:nth-child(4){ animation-delay:.3s; }
+  .wave-bar:nth-child(5){ animation-delay:.4s; }
+  @keyframes wave {
+    0%,100%{ height:6px;  }
+    50%    { height:24px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6"
+     x-data="minutesRecorder()" x-init="init()">
+
+  <!-- Header -->
+  <div class="flex items-center gap-4">
+    <a href="{{ url_for('minutes.index') }}"
+       class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+      <i class="ri-arrow-left-line text-xl"></i>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <i class="ri-mic-line text-primary-600"></i> New Meeting Minutes
+      </h1>
+      <p class="text-sm text-gray-500">Record voice, transcribe, and generate AI-powered minutes</p>
+    </div>
+  </div>
+
+  <form method="POST" id="minutesForm" action="{{ url_for('minutes.new') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="transcript" x-model="transcript">
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- ──────── Left column: Metadata ──────── -->
+      <div class="lg:col-span-1 space-y-5">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
+          <h2 class="font-semibold text-gray-800 flex items-center gap-2">
+            <i class="ri-information-line text-primary-500"></i> Meeting Details
+          </h2>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Title <span class="text-red-500">*</span></label>
+            <input type="text" name="title" required
+                   placeholder="Department Staff Meeting..."
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none">
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Date <span class="text-red-500">*</span></label>
+              <input type="date" name="meeting_date" required value="{{ today }}"
+                     class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Time</label>
+              <input type="time" name="meeting_time"
+                     class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Venue</label>
+            <input type="text" name="venue" placeholder="Senate Chamber, Block A..."
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Chairperson</label>
+            <input type="text" name="chairperson" placeholder="Prof. John Doe"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Attendees</label>
+            <textarea name="attendees" rows="3"
+                      placeholder="Dr. Jane Smith, Mr. Ali Hassan, ..."
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none resize-none"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Agenda</label>
+            <textarea name="agenda" rows="4"
+                      placeholder="1. Opening prayer&#10;2. Confirmation of last minutes&#10;3. Matters arising&#10;..."
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none resize-none"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- ──────── Right column: Recording & Transcript ──────── -->
+      <div class="lg:col-span-2 space-y-5">
+
+        <!-- Voice Recorder Card -->
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <h2 class="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <i class="ri-mic-2-line text-primary-500"></i> Voice Recorder
+          </h2>
+
+          <!-- Browser support check -->
+          <div x-show="!speechSupported" class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 flex items-start gap-2">
+            <i class="ri-alert-line mt-0.5 flex-shrink-0"></i>
+            <span>Speech recognition not supported in this browser. Please use Chrome or Edge, or type your notes directly below.</span>
+          </div>
+
+          <!-- Recorder controls -->
+          <div class="flex flex-col items-center py-6 gap-4">
+            <!-- Big record button -->
+            <div class="relative">
+              <div x-show="isRecording"
+                   class="absolute inset-0 rounded-full bg-red-400 pulse-ring"></div>
+              <button type="button" @click="toggleRecording()"
+                      :disabled="!speechSupported"
+                      :class="isRecording
+                        ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-200'
+                        : 'bg-primary-600 hover:bg-primary-700 text-white shadow-lg shadow-primary-200'"
+                      class="relative w-20 h-20 rounded-full flex items-center justify-center transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                <i :class="isRecording ? 'ri-stop-fill' : 'ri-mic-fill'" class="text-3xl"></i>
+              </button>
+            </div>
+
+            <!-- Status -->
+            <div class="text-center">
+              <div x-show="isRecording" class="flex items-center gap-2 text-red-600 font-medium text-sm">
+                <span class="wave-bar h-2"></span>
+                <span class="wave-bar h-3"></span>
+                <span class="wave-bar h-5"></span>
+                <span class="wave-bar h-3"></span>
+                <span class="wave-bar h-2"></span>
+                <span class="ml-1">Recording... <span x-text="recordingTime"></span></span>
+              </div>
+              <p x-show="!isRecording" class="text-sm text-gray-500">
+                <span x-show="speechSupported">Click the microphone to start recording</span>
+              </p>
+            </div>
+
+            <!-- Live interim text badge -->
+            <div x-show="interimText" class="w-full p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 italic min-h-10" x-text="interimText"></div>
+          </div>
+
+          <!-- Toolbar -->
+          <div class="flex flex-wrap gap-2 mb-3">
+            <button type="button" @click="enhanceTranscript()"
+                    :disabled="!transcript.trim() || isEnhancing"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
+              <i :class="isEnhancing ? 'ri-loader-4-line animate-spin' : 'ri-magic-line'"></i>
+              <span x-text="isEnhancing ? 'Enhancing...' : 'AI Clean-up'"></span>
+            </button>
+            <button type="button" @click="clearTranscript()"
+                    :disabled="!transcript.trim()"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
+              <i class="ri-delete-bin-line"></i> Clear
+            </button>
+            <span class="ml-auto text-xs text-gray-400 self-center" x-text="transcript.split(' ').filter(w=>w).length + ' words'"></span>
+          </div>
+
+          <!-- Transcript textarea -->
+          <textarea x-model="transcript"
+                    rows="10"
+                    placeholder="Your transcribed text will appear here as you speak. You can also type or paste text directly..."
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm leading-relaxed focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none resize-y font-mono"></textarea>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="flex flex-wrap gap-3 justify-end">
+          <a href="{{ url_for('minutes.index') }}"
+             class="px-5 py-2.5 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
+            Cancel
+          </a>
+          <button type="submit"
+                  class="inline-flex items-center gap-2 px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg shadow transition-colors">
+            <i class="ri-save-line"></i> Save Meeting
+          </button>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function minutesRecorder() {
+  return {
+    isRecording:    false,
+    speechSupported: false,
+    transcript:     '',
+    interimText:    '',
+    isEnhancing:    false,
+    recordingTime:  '00:00',
+    _recognition:   null,
+    _timerInterval: null,
+    _seconds:       0,
+
+    init() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      this.speechSupported = !!SpeechRecognition;
+      if (!this.speechSupported) return;
+
+      const rec = new SpeechRecognition();
+      rec.continuous        = true;
+      rec.interimResults    = true;
+      rec.lang              = 'en-US';
+      rec.maxAlternatives   = 1;
+      this._recognition     = rec;
+
+      rec.onresult = (e) => {
+        let interim = '';
+        let final   = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const t = e.results[i][0].transcript;
+          if (e.results[i].isFinal) final += t + ' ';
+          else interim += t;
+        }
+        if (final)   this.transcript  += final;
+        this.interimText = interim;
+      };
+
+      rec.onerror = (e) => {
+        console.warn('Speech error:', e.error);
+        if (e.error !== 'no-speech') this.stopRecording();
+      };
+
+      rec.onend = () => {
+        if (this.isRecording) rec.start();   // auto-restart for continuous
+      };
+    },
+
+    toggleRecording() {
+      this.isRecording ? this.stopRecording() : this.startRecording();
+    },
+
+    startRecording() {
+      if (!this._recognition) return;
+      this._recognition.start();
+      this.isRecording  = true;
+      this.interimText  = '';
+      this._seconds     = 0;
+      this._timerInterval = setInterval(() => {
+        this._seconds++;
+        const m = String(Math.floor(this._seconds / 60)).padStart(2, '0');
+        const s = String(this._seconds % 60).padStart(2, '0');
+        this.recordingTime = `${m}:${s}`;
+      }, 1000);
+    },
+
+    stopRecording() {
+      if (this._recognition) this._recognition.stop();
+      this.isRecording  = false;
+      this.interimText  = '';
+      clearInterval(this._timerInterval);
+    },
+
+    clearTranscript() {
+      if (confirm('Clear the transcript?')) {
+        this.transcript  = '';
+        this.interimText = '';
+      }
+    },
+
+    async enhanceTranscript() {
+      if (!this.transcript.trim()) return;
+      this.isEnhancing = true;
+      try {
+        const resp = await fetch('{{ url_for("minutes.api_enhance_transcript") }}', {
+          method:  'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken':  document.querySelector('meta[name="csrf-token"]').content
+          },
+          body: JSON.stringify({ transcript: this.transcript })
+        });
+        const data = await resp.json();
+        if (data.transcript) this.transcript = data.transcript;
+        else alert('Enhancement failed: ' + (data.error || 'Unknown error'));
+      } catch(err) {
+        alert('Network error: ' + err.message);
+      } finally {
+        this.isEnhancing = false;
+      }
+    }
+  };
+}
+</script>
+{% endblock %}

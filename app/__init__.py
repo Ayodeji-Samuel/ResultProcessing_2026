@@ -36,6 +36,7 @@ def create_app(config_name='default'):
     from app.routes.results import results_bp
     from app.routes.reports import reports_bp
     from app.routes.settings import settings_bp
+    from app.routes.minutes import minutes_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -44,6 +45,14 @@ def create_app(config_name='default'):
     app.register_blueprint(results_bp, url_prefix='/results')
     app.register_blueprint(reports_bp, url_prefix='/reports')
     app.register_blueprint(settings_bp, url_prefix='/settings')
+    app.register_blueprint(minutes_bp, url_prefix='/minutes')
+
+    # Landing page route (public)
+    from flask import render_template
+
+    @app.route('/landing')
+    def landing():
+        return render_template('landing.html')
     
     # Create database tables
     with app.app_context():

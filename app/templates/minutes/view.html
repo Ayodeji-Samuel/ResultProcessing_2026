@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}{{ record.title }} – EDSU Minutes{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Rendered Markdown minutes styles */
+  .minutes-content h1,.minutes-content h2 { color:#0c4a6e; font-weight:700; margin-top:1.4rem; margin-bottom:.4rem; }
+  .minutes-content h1 { font-size:1.15rem; }
+  .minutes-content h2 { font-size:1.05rem; }
+  .minutes-content h3 { font-size:.95rem; font-weight:600; color:#374151; margin-top:.8rem; }
+  .minutes-content p  { margin-bottom:.6rem; line-height:1.7; color:#374151; font-size:.9rem; }
+  .minutes-content ul,.minutes-content ol { margin:0 0 .8rem 1.2rem; }
+  .minutes-content li { margin-bottom:.25rem; font-size:.9rem; color:#374151; }
+  .minutes-content table { width:100%; border-collapse:collapse; margin:.8rem 0; font-size:.85rem; }
+  .minutes-content th { background:#0c4a6e; color:#fff; padding:8px 10px; text-align:left; }
+  .minutes-content td { padding:7px 10px; border-bottom:1px solid #e5e7eb; color:#374151; }
+  .minutes-content tr:nth-child(even) td { background:#f8fafc; }
+  .minutes-content hr { border:none; border-top:1.5px solid #bae6fd; margin:1rem 0; }
+  .minutes-content strong { color:#1e3a5f; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6"
+     x-data="minutesView()" x-init="init()">
+
+  <!-- Top bar -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <a href="{{ url_for('minutes.index') }}"
+         class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+        <i class="ri-arrow-left-line text-xl"></i>
+      </a>
+      <div>
+        <h1 class="text-xl font-bold text-gray-900">{{ record.title }}</h1>
+        <p class="text-sm text-gray-500">
+          {{ record.meeting_date.strftime('%A, %d %B %Y') if record.meeting_date }}
+          {% if record.meeting_time %} &bull; {{ record.meeting_time }}{% endif %}
+          {% if record.venue %} &bull; {{ record.venue }}{% endif %}
+        </p>
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      {% if record.status == 'draft' %}
+      <form method="POST" action="{{ url_for('minutes.finalize', meeting_id=record.id) }}" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit"
+                class="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors">
+          <i class="ri-checkbox-circle-line"></i> Finalize
+        </button>
+      </form>
+      {% endif %}
+      <a href="{{ url_for('minutes.edit', meeting_id=record.id) }}"
+         class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
+        <i class="ri-edit-line"></i> Edit
+      </a>
+      <a href="{{ url_for('minutes.export_pdf', meeting_id=record.id) }}"
+         class="inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors">
+        <i class="ri-file-pdf-line"></i> PDF
+      </a>
+    </div>
+  </div>
+
+  <!-- Status badge -->
+  <div class="flex items-center gap-3">
+    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium
+      {{ 'bg-green-100 text-green-800' if record.status == 'finalized' else 'bg-yellow-100 text-yellow-800' }}">
+      <i class="ri-{{ 'checkbox-circle-fill' if record.status == 'finalized' else 'time-fill' }} text-sm"></i>
+      {{ record.status.capitalize() }}
+    </span>
+    {% if record.ai_minutes %}
+    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
+      <i class="ri-robot-line text-sm"></i> AI Minutes Generated
+    </span>
+    {% endif %}
+    <span class="text-xs text-gray-400 ml-auto">
+      Created by {{ record.created_by.full_name if record.created_by }}
+      on {{ record.created_at.strftime('%d %b %Y %H:%M') if record.created_at }}
+    </span>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- ── Left: Meta info ── -->
+    <div class="lg:col-span-1 space-y-4">
+      <!-- Meeting info card -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-3">
+        <h3 class="font-semibold text-gray-800 flex items-center gap-2">
+          <i class="ri-information-line text-primary-500"></i> Meeting Info
+        </h3>
+        {% macro meta_row(icon, label, value) %}
+        {% if value %}
+        <div class="flex gap-3 text-sm">
+          <i class="ri-{{ icon }} text-gray-400 mt-0.5 flex-shrink-0"></i>
+          <div>
+            <p class="text-xs text-gray-400">{{ label }}</p>
+            <p class="text-gray-700">{{ value }}</p>
+          </div>
+        </div>
+        {% endif %}
+        {% endmacro %}
+
+        {{ meta_row('calendar-event-line', 'Date',
+            record.meeting_date.strftime('%A, %d %B %Y') if record.meeting_date) }}
+        {{ meta_row('time-line', 'Time', record.meeting_time) }}
+        {{ meta_row('map-pin-2-line', 'Venue', record.venue) }}
+        {{ meta_row('user-star-line', 'Chairperson', record.chairperson) }}
+      </div>
+
+      <!-- Attendees -->
+      {% if record.attendees %}
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        <h3 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <i class="ri-group-line text-primary-500"></i> Attendees
+        </h3>
+        <ul class="space-y-1.5">
+          {% for person in record.attendees.split(',') if person.strip() %}
+          <li class="flex items-center gap-2 text-sm text-gray-700">
+            <div class="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+              <i class="ri-user-line text-primary-600 text-xs"></i>
+            </div>
+            {{ person.strip() }}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <!-- Agenda -->
+      {% if record.agenda %}
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        <h3 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <i class="ri-list-check-2 text-primary-500"></i> Agenda
+        </h3>
+        <ol class="space-y-1.5 list-decimal list-inside">
+          {% for item in record.agenda.splitlines() if item.strip() %}
+          <li class="text-sm text-gray-700 leading-relaxed">{{ item.strip() }}</li>
+          {% endfor %}
+        </ol>
+      </div>
+      {% endif %}
+
+      <!-- Action Items -->
+      {% if action_items %}
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        <h3 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <i class="ri-task-line text-green-500"></i> Action Items
+        </h3>
+        <div class="space-y-2">
+          {% for item in action_items %}
+          <div class="p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
+            <p class="text-gray-800 font-medium">{{ loop.index }}. {{ item.action }}</p>
+            {% if item.responsible %}<p class="text-gray-500 text-xs mt-0.5"><i class="ri-user-line"></i> {{ item.responsible }}</p>{% endif %}
+            {% if item.deadline %}<p class="text-gray-500 text-xs"><i class="ri-calendar-line"></i> {{ item.deadline }}</p>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ── Right: Minutes content ── -->
+    <div class="lg:col-span-2 space-y-5">
+
+      <!-- AI Minutes generation panel -->
+      {% if not record.ai_minutes %}
+      <div class="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-5">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h3 class="font-semibold text-purple-900 flex items-center gap-2">
+              <i class="ri-robot-line text-purple-600"></i> Generate AI Minutes
+            </h3>
+            <p class="text-sm text-purple-700 mt-1">
+              Let AI transform your transcript into professional, formal meeting minutes.
+            </p>
+          </div>
+          <button @click="generateMinutes()"
+                  :disabled="isGenerating || !hasTranscript"
+                  class="flex-shrink-0 inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
+            <i :class="isGenerating ? 'ri-loader-4-line animate-spin' : 'ri-sparkling-line'"></i>
+            <span x-text="isGenerating ? 'Generating...' : 'Generate Now'"></span>
+          </button>
+        </div>
+        <div x-show="!hasTranscript" class="mt-2 text-xs text-yellow-700 flex items-center gap-1">
+          <i class="ri-alert-line"></i> No transcript found. Please add a transcript first via Edit.
+        </div>
+        <div x-show="aiError" class="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700" x-text="aiError"></div>
+      </div>
+      {% endif %}
+
+      <!-- Minutes display -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 class="font-semibold text-gray-800 flex items-center gap-2">
+            <i class="ri-file-text-line text-primary-500"></i>
+            {% if record.ai_minutes %}AI-Generated Minutes{% else %}Transcript{% endif %}
+          </h3>
+          {% if record.ai_minutes %}
+          <button @click="generateMinutes()"
+                  :disabled="isGenerating"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 text-xs font-medium rounded-lg transition-colors disabled:opacity-50">
+            <i :class="isGenerating ? 'ri-loader-4-line animate-spin' : 'ri-refresh-line'"></i>
+            Regenerate
+          </button>
+          {% endif %}
+        </div>
+
+        <div class="p-6">
+          <div id="aiMinutesDisplay" class="minutes-content">
+            {% if record.ai_minutes %}
+              <!-- Rendered by JS marked library -->
+              <div id="minutesMarkdown" class="hidden">{{ record.ai_minutes }}</div>
+            {% elif record.raw_transcript %}
+              <p class="text-gray-600 leading-relaxed whitespace-pre-wrap text-sm">{{ record.raw_transcript }}</p>
+            {% else %}
+              <div class="text-center py-12 text-gray-400">
+                <i class="ri-file-text-line text-4xl mb-3"></i>
+                <p class="text-sm">No content yet. Add a transcript and generate AI minutes.</p>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Marked.js for Markdown rendering -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+  // Render stored markdown on page load
+  const mdEl = document.getElementById('minutesMarkdown');
+  if (mdEl) {
+    const display = document.getElementById('aiMinutesDisplay');
+    display.innerHTML = marked.parse(mdEl.textContent);
+  }
+</script>
+<script>
+function minutesView() {
+  return {
+    isGenerating: false,
+    aiError:      '',
+    hasTranscript: {{ 'true' if record.raw_transcript else 'false' }},
+
+    init() {},
+
+    async generateMinutes() {
+      this.isGenerating = true;
+      this.aiError = '';
+      const csrf = document.querySelector('meta[name="csrf-token"]').content;
+      try {
+        const resp = await fetch('{{ url_for("minutes.api_generate_minutes") }}', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+          body: JSON.stringify({
+            meeting_id:   {{ record.id }},
+            transcript:   {{ (record.raw_transcript or '')|tojson }},
+            title:        {{ record.title|tojson }},
+            meeting_date: {{ record.meeting_date.isoformat()|tojson if record.meeting_date else '""' }},
+            venue:        {{ (record.venue or '')|tojson }},
+            chairperson:  {{ (record.chairperson or '')|tojson }},
+            attendees:    {{ (record.attendees or '')|tojson }},
+            agenda:       {{ (record.agenda or '')|tojson }},
+          })
+        });
+        const data = await resp.json();
+        if (data.minutes) {
+          const display = document.getElementById('aiMinutesDisplay');
+          display.innerHTML = marked.parse(data.minutes);
+          // Reload to update sidebar action items etc.
+          setTimeout(() => location.reload(), 1200);
+        } else {
+          this.aiError = data.error || 'Generation failed.';
+        }
+      } catch(err) {
+        this.aiError = 'Network error: ' + err.message;
+      } finally {
+        this.isGenerating = false;
+      }
+    }
+  };
+}
+</script>
+{% endblock %}

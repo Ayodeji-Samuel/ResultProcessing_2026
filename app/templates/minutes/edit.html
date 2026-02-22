@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Edit Meeting – EDSU Minutes{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+  <!-- Header -->
+  <div class="flex items-center gap-4">
+    <a href="{{ url_for('minutes.view', meeting_id=record.id) }}"
+       class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+      <i class="ri-arrow-left-line text-xl"></i>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <i class="ri-edit-line text-primary-600"></i> Edit Meeting
+      </h1>
+      <p class="text-sm text-gray-500">Update meeting details and transcript</p>
+    </div>
+  </div>
+
+  <form method="POST" action="{{ url_for('minutes.edit', meeting_id=record.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Left: Metadata -->
+      <div class="lg:col-span-1 space-y-5">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
+          <h2 class="font-semibold text-gray-800 flex items-center gap-2">
+            <i class="ri-information-line text-primary-500"></i> Meeting Details
+          </h2>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Title <span class="text-red-500">*</span></label>
+            <input type="text" name="title" required value="{{ record.title }}"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none">
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Date <span class="text-red-500">*</span></label>
+              <input type="date" name="meeting_date" required
+                     value="{{ record.meeting_date.isoformat() if record.meeting_date }}"
+                     class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Time</label>
+              <input type="time" name="meeting_time"
+                     value="{{ record.meeting_time or '' }}"
+                     class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Venue</label>
+            <input type="text" name="venue" value="{{ record.venue or '' }}"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Chairperson</label>
+            <input type="text" name="chairperson" value="{{ record.chairperson or '' }}"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Attendees</label>
+            <textarea name="attendees" rows="3"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none resize-none">{{ record.attendees or '' }}</textarea>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Agenda</label>
+            <textarea name="agenda" rows="5"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none resize-none">{{ record.agenda or '' }}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Transcript -->
+      <div class="lg:col-span-2 space-y-5">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold text-gray-800 flex items-center gap-2">
+              <i class="ri-chat-voice-line text-primary-500"></i> Transcript / Notes
+            </h2>
+            <span class="text-xs text-gray-400" id="wordCount">0 words</span>
+          </div>
+          <textarea name="transcript" id="transcriptArea" rows="18"
+                    placeholder="Paste or type the meeting transcript / raw notes here..."
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm leading-relaxed focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none resize-y font-mono">{{ record.raw_transcript or '' }}</textarea>
+        </div>
+
+        <div class="flex flex-wrap gap-3 justify-end">
+          <a href="{{ url_for('minutes.view', meeting_id=record.id) }}"
+             class="px-5 py-2.5 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
+            Cancel
+          </a>
+          <button type="submit"
+                  class="inline-flex items-center gap-2 px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg shadow transition-colors">
+            <i class="ri-save-line"></i> Save Changes
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const ta = document.getElementById('transcriptArea');
+  const wc = document.getElementById('wordCount');
+  function updateWordCount() {
+    const words = ta.value.trim().split(/\s+/).filter(w => w).length;
+    wc.textContent = words + ' words';
+  }
+  ta.addEventListener('input', updateWordCount);
+  updateWordCount();
+</script>
+{% endblock %}

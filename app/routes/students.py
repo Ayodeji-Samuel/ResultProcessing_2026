@@ -77,101 +77,131 @@ def upload():
         return redirect(url_for('dashboard.sessions'))
     
     if request.method == 'POST':
-        # Get form data
-        level = request.form.get('level', type=int)
-        program = request.form.get('program', '')
+        # Default level/program from the form (optional — can be overridden per row in CSV)
+        default_level = request.form.get('level', type=int)
+        default_program = request.form.get('program', '').strip()
         file = request.files.get('file')
-        
-        # Validate access
+
+        # Validate access restrictions against the form defaults
         level_access, program_access = get_accessible_filters()
-        if level_access and level != level_access:
+        if level_access and default_level and default_level != level_access:
             flash('You can only upload students for your assigned level.', 'danger')
             return redirect(url_for('students.upload'))
-        if program_access and program != program_access:
+        if program_access and default_program and default_program != program_access:
             flash('You can only upload students for your assigned program.', 'danger')
             return redirect(url_for('students.upload'))
-        
-        if not level or not program:
-            flash('Level and Program are required.', 'danger')
-            return redirect(url_for('students.upload'))
-        
+
         if not file or file.filename == '':
             flash('Please select a CSV file.', 'danger')
             return redirect(url_for('students.upload'))
-        
+
         if not allowed_file(file.filename, Config.ALLOWED_EXTENSIONS):
             flash('Only CSV files are allowed.', 'danger')
             return redirect(url_for('students.upload'))
-        
+
         # Parse CSV
         file_content = file.read()
         records, errors = parse_student_csv(file_content)
-        
-        if not records:
+
+        if not records and errors:
             flash(f'No valid records found. Errors: {"; ".join(errors)}', 'danger')
             return redirect(url_for('students.upload'))
-        
+
         # Process records
         added = 0
         updated = 0
+        skipped = 0
         failed = 0
-        
+
         for record in records:
             try:
-                # Check if student exists
+                # Per-row level/program: use CSV value if present, else form default
+                row_level = record.get('level') or default_level
+                row_program = record.get('program') or default_program or ''
+
+                # Enforce access control on per-row values
+                if level_access and row_level and row_level != level_access:
+                    errors.append(
+                        f"{record['matric_number']}: Level {row_level} not allowed "
+                        f"(you are assigned to level {level_access}) — skipped"
+                    )
+                    skipped += 1
+                    continue
+                if program_access and row_program and row_program != program_access:
+                    errors.append(
+                        f"{record['matric_number']}: Program '{row_program}' not allowed "
+                        f"(you are assigned to '{program_access}') — skipped"
+                    )
+                    skipped += 1
+                    continue
+
+                if not row_level or not row_program:
+                    errors.append(
+                        f"{record['matric_number']}: Level and Program are required — "
+                        f"provide them in the CSV or select defaults on the form"
+                    )
+                    failed += 1
+                    continue
+
+                # Check if student already exists in this session (DB-level duplicate)
                 existing = Student.query.filter_by(
                     matric_number=record['matric_number'],
                     session_id=current_session.id
                 ).first()
-                
+
                 if existing:
-                    # Update existing
+                    # Update existing record
                     existing.surname = record['surname']
                     existing.first_name = record['first_name']
                     existing.other_names = record['other_names']
                     existing.gender = record.get('gender')
-                    existing.level = level
-                    existing.program = program
+                    existing.level = row_level
+                    existing.program = row_program
                     updated += 1
                 else:
-                    # Create new
+                    # Create new record
                     student = Student(
                         matric_number=record['matric_number'],
                         surname=record['surname'],
                         first_name=record['first_name'],
                         other_names=record['other_names'],
                         gender=record.get('gender'),
-                        level=level,
-                        program=program,
+                        level=row_level,
+                        program=row_program,
                         session_id=current_session.id
                     )
                     db.session.add(student)
                     added += 1
-                    
+
             except Exception as e:
                 failed += 1
                 errors.append(f"{record['matric_number']}: {str(e)}")
         
         db.session.commit()
-        
+
         # Log upload
         log = UploadLog(
             user_id=current_user.id,
             upload_type='students',
             filename=file.filename,
             records_processed=added + updated,
-            records_failed=failed,
-            status='success' if failed == 0 else 'partial',
+            records_failed=failed + skipped,
+            status='success' if (failed + skipped) == 0 else 'partial',
             error_message='; '.join(errors) if errors else None
         )
         db.session.add(log)
         db.session.commit()
-        
-        flash(f'Upload complete: {added} added, {updated} updated, {failed} failed.', 
-              'success' if failed == 0 else 'warning')
-        
+
+        parts = [f'{added} added', f'{updated} updated']
+        if skipped:
+            parts.append(f'{skipped} skipped (duplicates/access)')
+        if failed:
+            parts.append(f'{failed} failed')
+        flash(f'Upload complete: {", ".join(parts)}.',
+              'success' if (failed + skipped) == 0 else 'warning')
+
         if errors:
-            flash(f'Errors: {"; ".join(errors[:5])}{"..." if len(errors) > 5 else ""}', 'warning')
+            flash(f'Notices: {"; ".join(errors[:5])}{"..." if len(errors) > 5 else ""}', 'warning')
         
         return redirect(url_for('students.index'))
     

@@ -31,20 +31,25 @@
                 <form method="POST" action="{{ url_for('students.upload') }}" enctype="multipart/form-data">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     
-                    <!-- Level and Program Selection -->
+                    <!-- Default Level and Program (optional when CSV has per-row values) -->
                     <div class="mb-6">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-1 flex items-center">
                             <span class="w-6 h-6 bg-green-600 text-white rounded-full flex items-center justify-center text-xs mr-2">1</span>
-                            Select Level & Program
+                            Default Level &amp; Program
+                            <span class="ml-2 text-xs font-normal text-gray-500">(optional when CSV includes Level / Program columns)</span>
                         </h3>
-                        
+                        <p class="text-xs text-gray-500 mb-4 ml-8">
+                            If the CSV already has <strong>Level</strong> and <strong>Program</strong> columns, per-row values take
+                            priority. These dropdowns act as fallback defaults for rows that don&rsquo;t specify them.
+                        </p>
+
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label for="level" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Level <span class="text-red-500">*</span>
+                                    Default Level <span class="text-gray-400 font-normal">(optional)</span>
                                 </label>
-                                <select name="level" id="level" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" required {{ 'disabled' if level_access }}>
-                                    <option value="">Select Level</option>
+                                <select name="level" id="level" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" {{ 'disabled' if level_access }}>
+                                    <option value="">— Use CSV column —</option>
                                     {% for level in levels %}
                                     <option value="{{ level }}" {{ 'selected' if level_access == level }}>{{ level }} Level</option>
                                     {% endfor %}
@@ -58,10 +63,10 @@
                             </div>
                             <div>
                                 <label for="program" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Program <span class="text-red-500">*</span>
+                                    Default Program <span class="text-gray-400 font-normal">(optional)</span>
                                 </label>
-                                <select name="program" id="program" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" required {{ 'disabled' if program_access }}>
-                                    <option value="">Select Program</option>
+                                <select name="program" id="program" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" {{ 'disabled' if program_access }}>
+                                    <option value="">— Use CSV column —</option>
                                     {% for code, name in programs %}
                                     <option value="{{ code }}" {{ 'selected' if program_access == code }}>{{ name }}</option>
                                     {% endfor %}
@@ -138,11 +143,19 @@
                 </li>
                 <li class="flex items-start">
                     <i class="ri-checkbox-circle-line mr-2 mt-0.5 text-blue-200"></i>
-                    <span><strong>Other Names</strong> (optional)</span>
+                    <span><strong>Other Names</strong> <em>(optional)</em></span>
                 </li>
                 <li class="flex items-start">
                     <i class="ri-checkbox-circle-line mr-2 mt-0.5 text-blue-200"></i>
-                    <span><strong>Gender</strong> (optional - M or F)</span>
+                    <span><strong>Gender</strong> <em>(optional)</em> &mdash; M or F</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-checkbox-circle-line mr-2 mt-0.5 text-blue-200"></i>
+                    <span><strong>Level</strong> <em>(optional)</em> &mdash; 100, 200, 300, 400</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-checkbox-circle-line mr-2 mt-0.5 text-blue-200"></i>
+                    <span><strong>Program</strong> <em>(optional)</em> &mdash; e.g. Computer Science</span>
                 </li>
             </ul>
             
@@ -167,11 +180,15 @@
                 </li>
                 <li class="flex items-start">
                     <i class="ri-information-line text-primary-600 mr-2 mt-0.5"></i>
-                    <span>Existing students will be updated</span>
+                    <span>Existing students will be updated (not duplicated)</span>
                 </li>
                 <li class="flex items-start">
                     <i class="ri-information-line text-primary-600 mr-2 mt-0.5"></i>
-                    <span>All assigned to selected level & program</span>
+                    <span>CSV Level &amp; Program override form defaults per row</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="ri-information-line text-primary-600 mr-2 mt-0.5"></i>
+                    <span>Duplicate matric numbers within the CSV are skipped</span>
                 </li>
                 <li class="flex items-start">
                     <i class="ri-alert-line text-yellow-500 mr-2 mt-0.5"></i>

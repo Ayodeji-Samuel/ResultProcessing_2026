@@ -419,3 +419,30 @@ class ResultAlteration(db.Model):
     
     def __repr__(self):
         return f'<ResultAlteration {self.id} - {self.student_matric} - {self.course_code}>'
+
+
+class MeetingMinutes(db.Model):
+    """Model for storing meeting minutes records"""
+    __tablename__ = 'meeting_minutes'
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(256), nullable=False)
+    meeting_date = db.Column(db.Date, nullable=False)
+    meeting_time = db.Column(db.String(10))           # HH:MM
+    venue = db.Column(db.String(256))
+    chairperson = db.Column(db.String(128))
+    attendees = db.Column(db.Text)                    # Comma-separated or JSON names
+    agenda = db.Column(db.Text)                       # Agenda items (JSON list or plain text)
+    raw_transcript = db.Column(db.Text)               # Raw voice transcript
+    ai_minutes = db.Column(db.Text)                   # AI-generated formatted minutes (Markdown)
+    action_items = db.Column(db.Text)                 # Extracted action items (JSON)
+    status = db.Column(db.String(20), default='draft')  # draft, finalized
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    created_by = db.relationship('User', foreign_keys=[created_by_id], backref='meeting_minutes')
+
+    def __repr__(self):
+        return f'<MeetingMinutes {self.id} - {self.title}>'

@@ -19,33 +19,59 @@ def allowed_file(filename, allowed_extensions):
            filename.rsplit('.', 1)[1].lower() in allowed_extensions
 
 
+# Valid program names accepted in CSV (case-insensitive matching)
+_VALID_PROGRAMS = {
+    'computer science': 'Computer Science',
+    'cs': 'Computer Science',
+    'csc': 'Computer Science',
+    'cyber security': 'Cyber Security',
+    'cybersecurity': 'Cyber Security',
+    'cbs': 'Cyber Security',
+    'software engineering': 'Software Engineering',
+    'swe': 'Software Engineering',
+    'pgd computer science': 'PGD Computer Science',
+    'pgd': 'PGD Computer Science',
+    'msc computer science': 'MSc Computer Science',
+    'msc': 'MSc Computer Science',
+    'phd computer science': 'PhD Computer Science',
+    'phd': 'PhD Computer Science',
+}
+
+_VALID_LEVELS = {100, 200, 300, 400, 500, 600, 700}
+
+
 def parse_student_csv(file_content):
     """
     Parse student records from CSV file.
-    Expected columns: Matric Number, Surname, First Name, Other Names (optional)
-    
+    Expected columns: Matric Number, Surname, First Name, Other Names (optional),
+                      Gender (optional), Level (optional), Program (optional)
+
+    Level and Program columns are optional in the CSV — if omitted, the caller
+    should supply default values.  Within-file duplicate matric numbers are
+    flagged and skipped (only the first occurrence is kept).
+
     Args:
-        file_content: The CSV file content (string or file object)
-    
+        file_content: The CSV file content (bytes or string)
+
     Returns:
         tuple: (records, errors)
             records: List of dicts with student data
-            errors: List of error messages
+            errors: List of error/warning messages
     """
     records = []
     errors = []
-    
+
     try:
         if isinstance(file_content, bytes):
             file_content = file_content.decode('utf-8-sig')  # Handle BOM
-        
+
         reader = csv.DictReader(io.StringIO(file_content))
-        
+
         # Normalize column names
         fieldnames = reader.fieldnames
         if not fieldnames:
             return ([], ['CSV file is empty or has no headers'])
-        
+
         # Map expected column names (case-insensitive)
         column_map = {}
         for field in fieldnames:
@@ -60,21 +86,60 @@ def parse_student_csv(file_content):
                 column_map['other_names'] = field
             elif 'gender' in field_lower or 'sex' in field_lower:
                 column_map['gender'] = field
-        
+            elif 'level' in field_lower:
+                column_map['level'] = field
+            elif 'program' in field_lower or 'programme' in field_lower or 'course' in field_lower:
+                column_map['program'] = field
+
         # Validate required columns
         required = ['matric_number', 'surname', 'first_name']
         missing = [col for col in required if col not in column_map]
         if missing:
             return ([], [f'Missing required columns: {", ".join(missing)}'])
-        
+
+        seen_matrics = {}  # Track matric -> row_num for duplicate detection
+
         for row_num, row in enumerate(reader, start=2):
             try:
-                matric = row.get(column_map['matric_number'], '').strip()
+                matric = row.get(column_map['matric_number'], '').strip().upper()
                 surname = row.get(column_map['surname'], '').strip()
                 first_name = row.get(column_map['first_name'], '').strip()
                 other_names = row.get(column_map.get('other_names', ''), '').strip() if 'other_names' in column_map else ''
                 gender = row.get(column_map.get('gender', ''), '').strip().upper() if 'gender' in column_map else ''
-                
+
+                # --- Level (from CSV) ---
+                level = None
+                if 'level' in column_map:
+                    level_raw = row.get(column_map['level'], '').strip()
+                    if level_raw:
+                        try:
+                            level_int = int(float(level_raw))
+                            if level_int in _VALID_LEVELS:
+                                level = level_int
+                            else:
+                                errors.append(f'Row {row_num}: Invalid level "{level_raw}" — must be one of {sorted(_VALID_LEVELS)}')
+                                continue
+                        except (ValueError, TypeError):
+                            errors.append(f'Row {row_num}: Non-numeric level value "{level_raw}"')
+                            continue
+
+                # --- Program (from CSV) ---
+                program = None
+                if 'program' in column_map:
+                    prog_raw = row.get(column_map['program'], '').strip()
+                    if prog_raw:
+                        normalized = _VALID_PROGRAMS.get(prog_raw.lower())
+                        if normalized:
+                            program = normalized
+                        else:
+                            # Accept the value as-is if it looks like a known program
+                            if any(prog_raw.lower() in k for k in _VALID_PROGRAMS):
+                                program = prog_raw.title()
+                            else:
+                                errors.append(f'Row {row_num}: Unrecognised program "{prog_raw}"')
+                                continue
+
+                # --- Basic field validation ---
                 if not matric:
                     errors.append(f'Row {row_num}: Missing matric number')
                     continue
@@ -84,20 +149,31 @@ def parse_student_csv(file_content):
                 if not first_name:
                     errors.append(f'Row {row_num}: Missing first name')
                     continue
-                
+
+                # --- Within-file duplicate check ---
+                if matric in seen_matrics:
+                    errors.append(
+                        f'Row {row_num}: Duplicate matric number "{matric}" '
+                        f'(first seen at row {seen_matrics[matric]}) — skipped'
+                    )
+                    continue
+                seen_matrics[matric] = row_num
+
                 records.append({
-                    'matric_number': matric.upper(),
+                    'matric_number': matric,
                     'surname': surname.upper(),
                     'first_name': first_name.title(),
                     'other_names': other_names.title() if other_names else None,
-                    'gender': gender if gender in ['M', 'F'] else None
+                    'gender': gender if gender in ['M', 'F'] else None,
+                    'level': level,      # None means «use form default»
+                    'program': program,  # None means «use form default»
                 })
             except Exception as e:
                 errors.append(f'Row {row_num}: {str(e)}')
-        
+
     except Exception as e:
         errors.append(f'Error parsing CSV: {str(e)}')
-    
+
     return (records, errors)
 
 
@@ -199,16 +275,20 @@ def generate_sample_student_csv():
       - FSC/SWE/xxxxxxxx  (Software Engineering)
       - FSC/CSC/CV/xxxxxxxx (Conversion - Computer Science)
       - JAMB registration number (new students without matric)
-    
+
+    Level and Program columns are optional — if included they override the
+    default level/program selected on the upload form.  This allows a single
+    CSV to contain students from different levels or programs.
+
     Returns:
         str: Sample CSV content
     """
-    content = "Matric Number,Surname,First Name,Other Names,Gender\n"
-    content += "FSC/CSC/24001,ADEYEMI,John,Oluwaseun,M\n"
-    content += "FSC/CBS/24002,OKONKWO,Mary,Chidinma,F\n"
-    content += "FSC/SWE/24003,IBRAHIM,Ahmed,Musa,M\n"
-    content += "FSC/CSC/CV/23001,OSAGIE,Grace,,F\n"
-    content += "2024123456AB,EKHATOR,Peter,Osahon,M\n"  # JAMB reg (no matric yet)
+    content = "Matric Number,Surname,First Name,Other Names,Gender,Level,Program\n"
+    content += "FSC/CSC/24001,ADEYEMI,John,Oluwaseun,M,100,Computer Science\n"
+    content += "FSC/CBS/24002,OKONKWO,Mary,Chidinma,F,100,Cyber Security\n"
+    content += "FSC/SWE/24003,IBRAHIM,Ahmed,Musa,M,200,Software Engineering\n"
+    content += "FSC/CSC/CV/23001,OSAGIE,Grace,,F,300,Computer Science\n"
+    content += "2024123456AB,EKHATOR,Peter,Osahon,M,100,Computer Science\n"  # JAMB reg
     return content
 
 
