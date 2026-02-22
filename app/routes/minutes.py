@@ -15,7 +15,11 @@ minutes_bp = Blueprint('minutes', __name__)
 
 # OpenRouter credentials and settings are pulled from environment variables.
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
-OPENROUTER_BASE    = "https://openrouter.ai/api/v1/chat/completions"
+# base URL for OpenRouter; can be overridden via environment
+OPENROUTER_BASE    = os.environ.get('OPENROUTER_BASE', "https://openrouter.ai/api/v1/chat/completions")
+# also allow fallback without "/api"
+ALT_OPENROUTER_BASE = os.environ.get('ALT_OPENROUTER_BASE', "https://openrouter.ai/v1/chat/completions")
+
 OPENROUTER_MODEL   = os.environ.get('OPENROUTER_MODEL', "google/gemini-flash-1.5")  # fast, capable model
 
 if not OPENROUTER_API_KEY:
@@ -46,6 +50,9 @@ def call_openrouter(system_prompt: str, user_content: str, temperature: float = 
         ],
     }
     resp = requests.post(OPENROUTER_BASE, headers=headers, json=payload, timeout=120)
+    # if not found, try alternate base if provided
+    if resp.status_code == 404 and ALT_OPENROUTER_BASE:
+        resp = requests.post(ALT_OPENROUTER_BASE, headers=headers, json=payload, timeout=120)
     resp.raise_for_status()
     try:
         data = resp.json()
