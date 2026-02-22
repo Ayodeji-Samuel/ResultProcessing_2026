@@ -26,11 +26,16 @@ if not OPENROUTER_API_KEY:
 
 def call_openrouter(system_prompt: str, user_content: str, temperature: float = 0.3) -> str:
     """Send a chat request to OpenRouter and return the text reply."""
+    # headers must be latin-1 encodable per RFC 7230; strip or replace any others
+    def clean_header(val: str) -> str:
+        return val.encode('latin-1', 'ignore').decode('latin-1')
+
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://edsu-results.local",
-        "X-Title": "EDSU Result Processing – Meeting Minutes",
+        "HTTP-Referer": clean_header("https://edsu-results.local"),
+        # replace en-dash with hyphen in title header to avoid encoding error
+        "X-Title": clean_header("EDSU Result Processing - Meeting Minutes"),
     }
     payload = {
         "model": OPENROUTER_MODEL,
