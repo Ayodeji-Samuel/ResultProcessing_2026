@@ -13,9 +13,15 @@ minutes_bp = Blueprint('minutes', __name__)
 
 # ─────────────────────────── helpers ────────────────────────────────────────
 
-OPENROUTER_API_KEY = "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"
+# OpenRouter credentials and settings are pulled from environment variables.
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
 OPENROUTER_BASE    = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_MODEL   = "google/gemini-flash-1.5"          # fast, capable model
+OPENROUTER_MODEL   = os.environ.get('OPENROUTER_MODEL', "google/gemini-flash-1.5")  # fast, capable model
+
+if not OPENROUTER_API_KEY:
+    # warn at import time; the routes will still function but AI requests will fail elegantly
+    import logging
+    logging.getLogger(__name__).warning('OPENROUTER_API_KEY not set in environment')
 
 
 def call_openrouter(system_prompt: str, user_content: str, temperature: float = 0.3) -> str:

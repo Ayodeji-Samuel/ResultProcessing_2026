@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Virtualenv
+.venv/
+
+# Environment variables
+.env
+
+# Flask uploads
+uploads/
+
+# Instance folder (Flask)
+instance/
+
+# PyCharm
+.idea/
+
+# VSCode settings
+.vscode/
+
+# MacOS
+.DS_Store
+
+# Logs
+*.log
+
+# Certificates
+*.pem
+
+# Ignore local sqlite dbs
+instance/*.db
+

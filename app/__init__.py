@@ -15,6 +15,10 @@ login_manager.login_message_category = 'info'
 
 
 def create_app(config_name='default'):
+    # load .env variables early so they are available to configuration
+    from dotenv import load_dotenv
+    load_dotenv()
+
     app = Flask(__name__)
     app.config.from_object(config[config_name])
     
