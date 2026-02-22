@@ -11,7 +11,19 @@ from reportlab.lib.units import cm
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
 from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, Table,
                                 TableStyle, HRFlowable, Image, KeepTogether)
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase.pdfmetrics import stringWidth
+import pkg_resources
+
+# register a unicode-capable font if available
+try:
+    # attempt to use DejaVuSans which is widely available
+    pdfmetrics.registerFont(TTFont('DejaVuSans', pkg_resources.resource_filename('reportlab', 'fonts/DejaVuSans.ttf')))
+    DEFAULT_FONT = 'DejaVuSans'
+except Exception:
+    # fallback to built-in Helvetica (Latin-1 only)
+    DEFAULT_FONT = 'Helvetica'
 
 
 # ─────────────────────── colour palette ─────────────────────────────────────
@@ -33,28 +45,28 @@ def _styles():
         if name not in base:
             base.add(ParagraphStyle(name=name, **kw))
 
-    add('UniName',    fontSize=15, fontName='Helvetica-Bold',
+    add('UniName',    fontSize=15, fontName=DEFAULT_FONT+'-Bold' if DEFAULT_FONT!='Helvetica' else 'Helvetica-Bold',
         alignment=TA_CENTER, textColor=NAVY, spaceAfter=2)
-    add('FacName',    fontSize=11, fontName='Helvetica',
+    add('FacName',    fontSize=11, fontName=DEFAULT_FONT,
         alignment=TA_CENTER, textColor=DGRAY, spaceAfter=2)
-    add('DocTitle',   fontSize=14, fontName='Helvetica-Bold',
+    add('DocTitle',   fontSize=14, fontName=DEFAULT_FONT+'-Bold' if DEFAULT_FONT!='Helvetica' else 'Helvetica-Bold',
         alignment=TA_CENTER, textColor=WHITE, spaceAfter=0)
-    add('MetaLabel',  fontSize=9,  fontName='Helvetica-Bold',
+    add('MetaLabel',  fontSize=9,  fontName=DEFAULT_FONT+'-Bold' if DEFAULT_FONT!='Helvetica' else 'Helvetica-Bold',
         textColor=NAVY)
-    add('MetaValue',  fontSize=9,  fontName='Helvetica',
+    add('MetaValue',  fontSize=9,  fontName=DEFAULT_FONT,
         textColor=DGRAY)
-    add('H2',         fontSize=11, fontName='Helvetica-Bold',
+    add('H2',         fontSize=11, fontName=DEFAULT_FONT+'-Bold' if DEFAULT_FONT!='Helvetica' else 'Helvetica-Bold',
         textColor=NAVY, spaceBefore=10, spaceAfter=4)
-    add('H3',         fontSize=10, fontName='Helvetica-Bold',
+    add('H3',         fontSize=10, fontName=DEFAULT_FONT+'-Bold' if DEFAULT_FONT!='Helvetica' else 'Helvetica-Bold',
         textColor=DGRAY, spaceBefore=6, spaceAfter=3)
-    add('Body',       fontSize=9,  fontName='Helvetica',
+    add('Body',       fontSize=9,  fontName=DEFAULT_FONT,
         textColor=DGRAY, leading=14, alignment=TA_JUSTIFY, spaceAfter=4)
-    add('BulletItem', fontSize=9,  fontName='Helvetica',
+    add('BulletItem', fontSize=9,  fontName=DEFAULT_FONT,
         textColor=DGRAY, leading=13, leftIndent=12, bulletIndent=0,
         spaceAfter=2)
-    add('ActionHdr',  fontSize=9,  fontName='Helvetica-Bold',
+    add('ActionHdr',  fontSize=9,  fontName=DEFAULT_FONT+'-Bold' if DEFAULT_FONT!='Helvetica' else 'Helvetica-Bold',
         textColor=WHITE)
-    add('Footer',     fontSize=7,  fontName='Helvetica',
+    add('Footer',     fontSize=7,  fontName=DEFAULT_FONT,
         textColor=MGRAY, alignment=TA_CENTER)
     return base
 
@@ -149,7 +161,11 @@ def _md_to_paragraphs(text: str, styles) -> list:
 
 
 def _clean(text: str) -> str:
-    """Convert Markdown inline markup to ReportLab XML tags."""
+    """Convert Markdown inline markup to ReportLab XML tags and normalise troublesome characters."""
+    # replace en/emdash with hyphen to avoid latin-1 issues in builtin fonts
+    text = text.replace('\u2013', '-')
+    text = text.replace('\u2014', '-')
+    # other potential non-latin1 characters can be stripped or replaced
     # Bold+italic
     text = re.sub(r'\*\*\*(.+?)\*\*\*', r'<b><i>\1</i></b>', text)
     # Bold
@@ -414,6 +430,39 @@ def generate_minutes_pdf(record, action_items: list) -> bytes:
         styles['Footer']
     ))
 
-    doc.build(story)
+    try:
+        doc.build(story)
+    except UnicodeEncodeError as ue:
+        # fallback: strip characters that cannot be encoded and rebuild
+        msg = str(ue)
+        current_app = None
+        try:
+            from flask import current_app
+        except ImportError:
+            pass
+        if current_app:
+            current_app.logger.warning(f"PDF encode error, stripping unsupported characters: {msg}")
+        # simple stripping: convert to latin-1 with ignore then back
+        def strip_text(s):
+            if isinstance(s, str):
+                return s.encode('latin-1', 'ignore').decode('latin-1')
+            return s
+        # recursively clean story flowables text
+        for i, f in enumerate(story):
+            if hasattr(f, 'text'):
+                f.text = strip_text(f.text)
+        # rebuild once more
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            leftMargin=2 * cm,
+            rightMargin=2 * cm,
+            topMargin=2.2 * cm,
+            bottomMargin=2 * cm,
+            title=record.title,
+            author='EDSU Result Processing System',
+        )
+        doc.build(story)
     buffer.seek(0)
     return buffer.read()
