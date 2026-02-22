@@ -53,11 +53,24 @@ def call_openrouter(system_prompt: str, user_content: str, temperature: float = 
     # if not found, try alternate base if provided
     if resp.status_code == 404 and ALT_OPENROUTER_BASE:
         resp = requests.post(ALT_OPENROUTER_BASE, headers=headers, json=payload, timeout=120)
-    resp.raise_for_status()
+
+    # capture details for debugging
+    status = resp.status_code
+    text = resp.text
+    if status >= 400:
+        # log full text (capped) and raise
+        msg = f"OpenRouter HTTP {status}: {text[:1000]}"
+        if current_app:
+            current_app.logger.error(msg)
+        resp.raise_for_status()
+
     try:
         data = resp.json()
     except ValueError as exc:
-        raise RuntimeError(f"OpenRouter returned non-JSON response: {resp.text[:300]}") from exc
+        # log full body for investigation
+        if current_app:
+            current_app.logger.error("OpenRouter non-JSON response:\n" + text)
+        raise RuntimeError(f"OpenRouter returned non-JSON response (status {status}); see logs for details") from exc
 
     # Handle error messages returned by the API (e.g. rate limit, bad key)
     if "error" in data:
