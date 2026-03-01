@@ -49,8 +49,8 @@ To verify the web interface works correctly, follow these steps:
 ### Step 1: Access the Application
 1. Open browser: http://127.0.0.1:5000
 2. Login with HoD credentials:
-   - Username: `hod@university.edu.ng`
-   - Password: `HoD@2026!`
+   - Username: created during bootstrap
+   - Password: generated during secure bootstrap
 
 ### Step 2: Test User Creation with Lecturer Role
 1. Navigate to **Users** → **Create User**

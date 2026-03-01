@@ -33,6 +33,9 @@ user-agents>=2.2.0
 # HTTP requests for IP geolocation
 requests>=2.31.0
 
+# PostgreSQL driver (DigitalOcean managed database)
+psycopg2-binary>=2.9.9
+
 # Environment variables (optional)
 python-dotenv>=1.0.0
 

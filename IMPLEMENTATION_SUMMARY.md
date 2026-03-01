@@ -171,8 +171,8 @@ A comprehensive **security and integrity system** with a multi-level approval wo
 1. **Login as HoD**
    ```
    URL: http://127.0.0.1:5000
-   Username: hod@university.edu.ng
-   Password: HoD@2026!
+   Username: set during secure bootstrap
+   Password: generated or provided securely during bootstrap
    ```
 
 2. **Create Users**

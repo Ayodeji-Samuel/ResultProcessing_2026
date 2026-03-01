@@ -9,13 +9,14 @@ Successfully ran `migrate_new_features.py` which added:
 - `result_alterations` table for tracking
 - Updated grading descriptions with defaults
 
-### ✅ Step 2: Created Admin User
-**Admin Credentials (SAVE THESE):**
-- **Username:** `samuel.makinde@edouniversity.edu.ng/ayodeji`
-- **Temporary Password:** `Wj8@ezl8Swc9`
-- **Role:** Administrator (Complete System Access)
+### ✅ Step 2: Create Admin User Securely
+Create an admin user with a generated temporary password:
 
-⚠️ **You MUST change this password on first login!**
+```bash
+python create_admin.py create --username your-admin@university.edu.ng --full-name "System Administrator" --generate-password
+```
+
+⚠️ **Store the generated password securely and change it on first login.**
 
 ### ✅ Step 3: Started Application
 Application is now running at: **http://127.0.0.1:5000**
@@ -26,7 +27,7 @@ Application is now running at: **http://127.0.0.1:5000**
 
 ### 🔐 Test 1: Admin Login
 1. Go to http://127.0.0.1:5000
-2. Login with admin credentials above
+2. Login with the admin credentials you created
 3. You'll be forced to change password
 4. Set a new secure password
 
@@ -104,24 +105,24 @@ After logging in as admin, verify you can see:
 
 ## Existing Users for Testing
 
-### 1. Admin User (YOU CREATED)
-- **Username:** samuel.makinde@edouniversity.edu.ng/ayodeji
-- **Password:** Wj8@ezl8Swc9 (change on first login)
+### 1. Admin User
+- **Username:** created by you using `create_admin.py`
+- **Password:** generated/provided during secure bootstrap
 - **Access:** Complete system access
 
 ### 2. Head of Department
-- **Username:** hod@university.edu.ng
-- **Password:** HoD@2026!
+- **Username:** create via User Management after admin login
+- **Password:** set securely when account is created/reset
 - **Access:** All features except Result Alterations
 
 ### 3. Level Advisers
 - **Username:** adviser1@university.edu.ng, adviser2@university.edu.ng
-- **Password:** Default (likely needs reset)
+- **Password:** Set by your administrator
 - **Access:** Limited to their level
 
 ### 4. Lecturers
 - **Username:** adviser3@university.edu.ng, test_lecturer@edsu.edu.ng
-- **Password:** Default (likely needs reset)
+- **Password:** Set by your administrator
 - **Access:** Course-specific
 
 ---
@@ -214,8 +215,17 @@ python migrate_new_features.py
 
 ### Forgot Admin Password?
 ```bash
-# Create new admin or reset
-python create_admin.py
+# Generate a new secure admin password
+python create_admin.py create --username your-admin@university.edu.ng --full-name "System Administrator" --generate-password --promote-existing
+```
+
+### Clean Existing Test Data Before Real Upload
+```bash
+# Review what exists
+python clean_test_data.py --dry-run
+
+# Clean all test records, keep admin users, and clear uploaded files
+python clean_test_data.py --execute --delete-non-admin-users --clean-uploads
 ```
 
 ---

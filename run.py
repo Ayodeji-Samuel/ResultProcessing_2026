@@ -1,28 +1,12 @@
 #!/usr/bin/env python
-"""
-Result Processing System - Application Entry Point
-
-This script starts the Flask development server for the Result Processing System.
-For production deployment, use a WSGI server like Gunicorn or uWSGI.
-
-Usage:
-    python run.py
-
-The application will be available at: http://127.0.0.1:5000
-
-Default HoD (Head of Department) credentials:
-    Username: hod@university.edu.ng
-    Password: HoD@2026!
-    
-IMPORTANT: Change the password immediately after first login!
-"""
+"""Result Processing System - Application Entry Point."""
 
 import os
 from app import create_app, db
-from app.models import User, AcademicSession, GradingSystem
+from app.models import AcademicSession, GradingSystem
 
 # Create the Flask application
-app = create_app()
+app = create_app(os.environ.get('FLASK_CONFIG', 'default'))
 
 
 def initialize_database():
@@ -30,22 +14,6 @@ def initialize_database():
     with app.app_context():
         # Create all database tables
         db.create_all()
-        
-        # Check if HoD user exists
-        hod = User.query.filter_by(role='hod').first()
-        if not hod:
-            print("Creating default HoD (Head of Department) user...")
-            hod = User(
-                username='hod@university.edu.ng',
-                email='hod@university.edu.ng',
-                full_name='Head of Department',
-                role='hod',
-                is_active=True,
-                must_change_password=False,  # Set to False for initial setup
-                is_locked=False
-            )
-            hod.set_password('HoD@2026!')
-            db.session.add(hod)
             
         # Check if academic session exists
         session = AcademicSession.query.first()
@@ -95,10 +63,6 @@ if __name__ == '__main__':
     print("RESULT PROCESSING SYSTEM")
     print("=" * 60)
     print(f"\nServer starting at: http://127.0.0.1:5000")
-    print(f"\nDefault HoD (Head of Department) credentials:")
-    print(f"  Username: hod@university.edu.ng")
-    print(f"  Password: HoD@2026!")
-    print(f"\n[!] IMPORTANT: Change the default password after first login!")
     print(f"\nSecurity Features:")
     print(f"  - Account locks after 3 failed login attempts")
     print(f"  - Only HoD can create user accounts")
@@ -108,7 +72,7 @@ if __name__ == '__main__':
     
     # Run the Flask development server
     app.run(
-        host='127.0.0.1',
-        port=5000,
-        debug=True
+        host=os.environ.get('FLASK_HOST', '127.0.0.1'),
+        port=int(os.environ.get('FLASK_PORT', '5000')),
+        debug=app.config.get('DEBUG', False)
     )

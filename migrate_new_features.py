@@ -8,19 +8,12 @@ Database migration script to add new features:
 Run this script to update the database schema.
 """
 
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect, text
 import os
+from app import create_app, db
 
-# Create a minimal app for migration
-app = Flask(__name__)
-basedir = os.path.abspath(os.path.dirname(__file__))
-db_path = os.path.join(basedir, 'instance', 'results.db')
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-db = SQLAlchemy(app)
+# Create app using configured environment (works for SQLite/PostgreSQL/MySQL)
+app = create_app(os.environ.get('FLASK_CONFIG', 'default'))
 
 def check_column_exists(table_name, column_name):
     """Check if a column exists in a table"""

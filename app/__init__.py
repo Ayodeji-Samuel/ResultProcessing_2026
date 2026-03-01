@@ -21,6 +21,7 @@ def create_app(config_name='default'):
 
     app = Flask(__name__)
     app.config.from_object(config[config_name])
+    config[config_name].init_app(app)
     
     # Initialize extensions
     db.init_app(app)
@@ -62,23 +63,7 @@ def create_app(config_name='default'):
     with app.app_context():
         db.create_all()
         
-        # Create default HoD (Head of Department) user if none exists
-        from app.models import User, GradingSystem
-        if not User.query.filter_by(role='hod').first():
-            hod = User(
-                username='hod@university.edu.ng',
-                email='hod@university.edu.ng',
-                full_name='Head of Department',
-                role='hod',
-                is_active=True,
-                must_change_password=False  # HoD doesn't need to change on first login
-            )
-            hod.set_password('HoD@2026!')
-            db.session.add(hod)
-            db.session.commit()
-            print("Default HoD account created!")
-            print("Username: hod@university.edu.ng")
-            print("Password: HoD@2026!")
+        from app.models import GradingSystem
         
         # Create default grading systems if none exist
         if not GradingSystem.query.first():

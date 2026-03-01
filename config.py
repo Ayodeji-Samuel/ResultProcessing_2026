@@ -3,8 +3,16 @@ from datetime import timedelta
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
+
+def normalize_database_url(url):
+    if not url:
+        return url
+    if url.startswith('postgres://'):
+        return url.replace('postgres://', 'postgresql://', 1)
+    return url
+
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'your-secret-key-change-in-production-2026'
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'development-only-secret-key'
     # Database URI. By default we use SQLite for development, but the
     # connection string can be overridden via the DATABASE_URL environment
     # variable (ideally set in a .env file). For production it is expected that
@@ -13,9 +21,12 @@ class Config:
     #   DATABASE_URL=mysql+mysqldb://user:password@host:port/dbname
     #
     # Note: the package mysqlclient must be installed for the mysqldb driver.
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+    SQLALCHEMY_DATABASE_URI = normalize_database_url(os.environ.get('DATABASE_URL')) or \
         'sqlite:///' + os.path.join(basedir, 'instance', 'results.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True
+    }
     
     # Upload configurations
     UPLOAD_FOLDER = os.path.join(basedir, 'uploads')
@@ -93,6 +104,10 @@ class Config:
         ('lecturer', 'Lecturer'),
     ]
 
+    @staticmethod
+    def init_app(app):
+        pass
+
 
 class DevelopmentConfig(Config):
     DEBUG = True
@@ -101,6 +116,15 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     DEBUG = False
     SESSION_COOKIE_SECURE = True
+
+    @staticmethod
+    def init_app(app):
+        Config.init_app(app)
+        if not os.environ.get('SECRET_KEY'):
+            raise RuntimeError('SECRET_KEY must be set in production environment.')
+        if not os.environ.get('DATABASE_URL'):
+            raise RuntimeError('DATABASE_URL must be set in production environment.')
+        app.config['SQLALCHEMY_DATABASE_URI'] = normalize_database_url(os.environ.get('DATABASE_URL'))
 
 
 config = {
