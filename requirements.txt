@@ -36,6 +36,9 @@ requests>=2.31.0
 # PostgreSQL driver (DigitalOcean managed database)
 psycopg2-binary>=2.9.9
 
+# MySQL driver (Laragon / local MySQL / MariaDB)
+mysqlclient>=2.2.0
+
 # Environment variables (optional)
 python-dotenv>=1.0.0
 
