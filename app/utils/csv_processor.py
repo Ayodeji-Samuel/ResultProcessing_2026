@@ -273,7 +273,9 @@ def generate_sample_student_csv():
       - FSC/CSC/xxxxxxxx  (Computer Science)
       - FSC/CBS/xxxxxxxx  (Cybersecurity)
       - FSC/SWE/xxxxxxxx  (Software Engineering)
-      - FSC/CSC/CV/xxxxxxxx (Conversion - Computer Science)
+            - CVS/CSC/xxxxxxxx  (Conversion - Computer Science)
+            - CVS/CBS/xxxxxxxx  (Conversion - Cybersecurity)
+            - CVS/SWE/xxxxxxxx  (Conversion - Software Engineering)
       - JAMB registration number (new students without matric)
 
     Level and Program columns are optional — if included they override the
@@ -287,7 +289,7 @@ def generate_sample_student_csv():
     content += "FSC/CSC/24001,ADEYEMI,John,Oluwaseun,M,100,Computer Science\n"
     content += "FSC/CBS/24002,OKONKWO,Mary,Chidinma,F,100,Cyber Security\n"
     content += "FSC/SWE/24003,IBRAHIM,Ahmed,Musa,M,200,Software Engineering\n"
-    content += "FSC/CSC/CV/23001,OSAGIE,Grace,,F,300,Computer Science\n"
+    content += "CVS/CSC/23001,OSAGIE,Grace,,F,300,Computer Science\n"
     content += "2024123456AB,EKHATOR,Peter,Osahon,M,100,Computer Science\n"  # JAMB reg
     return content
 
@@ -297,7 +299,8 @@ def generate_sample_results_csv():
     Generate a sample results CSV file content.
     Matric number formats:
       FSC/CSC/xxxxxxxx, FSC/CBS/xxxxxxxx, FSC/SWE/xxxxxxxx,
-      FSC/CSC/CV/xxxxxxxx, or JAMB registration number.
+            CVS/CSC/xxxxxxxx, CVS/CBS/xxxxxxxx, CVS/SWE/xxxxxxxx,
+            or JAMB registration number.
     
     Returns:
         str: Sample CSV content
@@ -306,6 +309,6 @@ def generate_sample_results_csv():
     content += "FSC/CSC/24001,25,50\n"
     content += "FSC/CBS/24002,28,55\n"
     content += "FSC/SWE/24003,20,45\n"
-    content += "FSC/CSC/CV/23001,22,48\n"
+    content += "CVS/CSC/23001,22,48\n"
     content += "2024123456AB,18,40\n"  # Student using JAMB reg number
     return content

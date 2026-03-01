@@ -82,7 +82,7 @@ def generate_sample_past_results_csv():
         "FSC/CSC/20001,ADEYEMI JOHN OLUWASEUN,25,50",
         "FSC/CBS/20002,OKONKWO MARY CHIDINMA,28,55",
         "FSC/SWE/20003,IBRAHIM AHMED MUSA,20,45",
-        "FSC/CSC/CV/19001,OSAGIE GRACE,22,48",
+        "CVS/CSC/19001,OSAGIE GRACE,22,48",
         "2020123456AB,EKHATOR PETER OSAHON,18,40",
     ]
     return "\n".join(lines)
@@ -209,7 +209,7 @@ def parse_past_results_csv(file_content):
 
 # Regex patterns for matric / JAMB numbers
 _MATRIC_RE = re.compile(
-    r"FSC/(?:CSC|CBS|SWE)(?:/CV)?/\d+",  # FSC/CSC/CV/20001 style
+    r"(?:FSC|CVS)/(?:CSC|CBS|SWE)/\d+",  # FSC/CSC/20001 or CVS/CSC/19001 style
     re.IGNORECASE,
 )
 _JAMB_RE = re.compile(r"\d{8,}[A-Z]{0,3}", re.IGNORECASE)   # e.g. 2020123456AB

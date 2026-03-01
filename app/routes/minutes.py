@@ -1,13 +1,16 @@
-"""Meeting Minutes Routes - Voice Recording, AI Transcription & Minutes Generation"""
+"""Meeting Minutes Routes - Voice Recording, AI Transcription, Minutes Generation & Attendance"""
 import json
 import os
+import secrets
+import hashlib
+from datetime import date, datetime, timedelta
+
 import requests
-from datetime import date, datetime
 from flask import (Blueprint, render_template, redirect, url_for, flash,
-                   request, jsonify, current_app, make_response)
+                   request, jsonify, current_app, make_response, abort)
 from flask_login import login_required, current_user
-from app import db
-from app.models import MeetingMinutes
+from app import db, csrf
+from app.models import MeetingMinutes, AttendanceToken, MeetingAttendee, KnownAttendee
 
 minutes_bp = Blueprint('minutes', __name__)
 
@@ -20,7 +23,7 @@ OPENROUTER_BASE    = os.environ.get('OPENROUTER_BASE', "https://openrouter.ai/ap
 # also allow fallback without "/api"
 ALT_OPENROUTER_BASE = os.environ.get('ALT_OPENROUTER_BASE', "https://openrouter.ai/v1/chat/completions")
 
-OPENROUTER_MODEL   = os.environ.get('OPENROUTER_MODEL', "google/gemini-flash-1.5")  # fast, capable model
+OPENROUTER_MODEL   = os.environ.get('OPENROUTER_MODEL', "google/gemini-2.5-flash")  # fast, capable model
 
 if not OPENROUTER_API_KEY:
     # warn at import time; the routes will still function but AI requests will fail elegantly
@@ -50,15 +53,32 @@ def call_openrouter(system_prompt: str, user_content: str, temperature: float = 
         ],
     }
     resp = requests.post(OPENROUTER_BASE, headers=headers, json=payload, timeout=120)
-    # if not found, try alternate base if provided
+    # Only try alternate base on 404 if the primary returned non-JSON (i.e. a
+    # proxy/CDN 404, not an API-level 404 with a JSON error body).
     if resp.status_code == 404 and ALT_OPENROUTER_BASE:
-        resp = requests.post(ALT_OPENROUTER_BASE, headers=headers, json=payload, timeout=120)
+        try:
+            # If the body is already valid JSON from the API, don't retry –
+            # it's a real model-not-found / route error from the API itself.
+            resp.json()
+            # JSON decoded fine → it is an API error; keep resp as-is and fall
+            # through to the error handler below.
+        except ValueError:
+            # Non-JSON 404 (e.g. a CDN page) → try the alternate base URL.
+            resp = requests.post(ALT_OPENROUTER_BASE, headers=headers, json=payload, timeout=120)
 
     # capture details for debugging
     status = resp.status_code
     text = resp.text
     if status >= 400:
-        # log full text (capped) and raise
+        # Try to surface the API error message if the body is JSON
+        try:
+            err_data = resp.json()
+            if 'error' in err_data:
+                err_msg = err_data['error']
+                msg = err_msg.get('message', str(err_msg)) if isinstance(err_msg, dict) else str(err_msg)
+                raise RuntimeError(f"OpenRouter API error ({status}): {msg}")
+        except (ValueError, RuntimeError):
+            pass
         msg = f"OpenRouter HTTP {status}: {text[:1000]}"
         if current_app:
             current_app.logger.error(msg)
@@ -147,8 +167,26 @@ def new():
         )
         db.session.add(record)
         db.session.commit()
-        flash('Meeting saved. You can now generate AI minutes.', 'success')
-        return redirect(url_for('minutes.view', meeting_id=record.id))
+
+        # Auto-generate an attendance token so the link is immediately available
+        tok = AttendanceToken(
+            meeting_id    = record.id,
+            token         = secrets.token_urlsafe(32),
+            created_by_id = current_user.id,
+            expires_at    = None,
+            is_active     = True,
+        )
+        db.session.add(tok)
+        db.session.commit()
+
+        flash('Meeting saved! Share the attendance link below before you start recording.', 'success')
+        # Re-render the same page with the record and token so the user sees
+        # the attendance link immediately, without leaving the recording page.
+        return render_template('minutes/new.html',
+                               today=date.today().isoformat(),
+                               record=record,
+                               token=tok,
+                               host_url=request.host_url.rstrip('/'))
 
     return render_template('minutes/new.html', today=date.today().isoformat())
 
@@ -158,7 +196,6 @@ def new():
 @minutes_bp.route('/<int:meeting_id>')
 @login_required
 def view(meeting_id):
-    """View a saved meeting minutes record."""
     record = MeetingMinutes.query.get_or_404(meeting_id)
     _check_access(record)
     action_items = []
@@ -167,8 +204,13 @@ def view(meeting_id):
             action_items = json.loads(record.action_items)
         except (json.JSONDecodeError, TypeError):
             action_items = []
+    tokens    = AttendanceToken.query.filter_by(meeting_id=meeting_id).order_by(
+                    AttendanceToken.created_at.desc()).all()
+    submitted = MeetingAttendee.query.filter_by(meeting_id=meeting_id).order_by(
+                    MeetingAttendee.submitted_at).all()
     return render_template('minutes/view.html', record=record,
-                           action_items=action_items)
+                           action_items=action_items, tokens=tokens,
+                           submitted=submitted)
 
 
 # ─────────────────────────── edit ───────────────────────────────────────────
@@ -198,9 +240,40 @@ def edit(meeting_id):
         record.updated_at   = datetime.utcnow()
         db.session.commit()
         flash('Meeting updated successfully.', 'success')
+        # If the update came from the new-meeting recording page, stay there
+        # so the user can still see the attendance link and continue recording.
+        if request.form.get('_source') == 'new':
+            tok = AttendanceToken.query.filter_by(
+                meeting_id=record.id, is_active=True
+            ).order_by(AttendanceToken.created_at.desc()).first()
+            return render_template('minutes/new.html',
+                                   today=date.today().isoformat(),
+                                   record=record,
+                                   token=tok,
+                                   host_url=request.host_url.rstrip('/'))
         return redirect(url_for('minutes.view', meeting_id=record.id))
 
     return render_template('minutes/edit.html', record=record)
+
+
+# ───────────────────── save AI minutes text (inline edit) ─────────────────────
+
+@minutes_bp.route('/<int:meeting_id>/save-minutes', methods=['POST'])
+@login_required
+def save_minutes_text(meeting_id):
+    """Save inline-edited AI minutes text (AJAX)."""
+    record = MeetingMinutes.query.get_or_404(meeting_id)
+    _check_access(record)
+    body = request.get_json(force=True, silent=True) or {}
+    text = (body.get('text') or '').strip()
+    if not text:
+        return jsonify({'error': 'Empty text.'}), 400
+    record.ai_minutes   = text
+    record.updated_at   = datetime.utcnow()
+    action_items        = _extract_action_items(text)
+    record.action_items = json.dumps(action_items)
+    db.session.commit()
+    return jsonify({'ok': True, 'action_items': action_items})
 
 
 # ─────────────────────────── delete ─────────────────────────────────────────
@@ -222,14 +295,186 @@ def delete(meeting_id):
 @minutes_bp.route('/<int:meeting_id>/finalize', methods=['POST'])
 @login_required
 def finalize(meeting_id):
-    """Mark meeting minutes as finalized."""
     record = MeetingMinutes.query.get_or_404(meeting_id)
     _check_access(record)
-    record.status = 'finalized'
+    # Revoke all active attendance tokens when meeting is finalized
+    for tok in record.tokens:
+        tok.is_active = False
+    record.status     = 'finalized'
     record.updated_at = datetime.utcnow()
     db.session.commit()
-    flash('Meeting minutes finalized.', 'success')
+    flash('Meeting minutes finalized and all attendance links revoked.', 'success')
     return redirect(url_for('minutes.view', meeting_id=record.id))
+
+
+# ─────────────────────────── attendance link ──────────────────────────────────
+
+@minutes_bp.route('/<int:meeting_id>/attendance-link', methods=['POST'])
+@login_required
+def create_attendance_link(meeting_id):
+    """Generate a shareable attendance link for this meeting."""
+    record = MeetingMinutes.query.get_or_404(meeting_id)
+    _check_access(record)
+    expire_hours_str = request.form.get('expire_hours', '').strip()
+    expires_at = None
+    if expire_hours_str and expire_hours_str.isdigit() and int(expire_hours_str) > 0:
+        expires_at = datetime.utcnow() + timedelta(hours=int(expire_hours_str))
+    tok = AttendanceToken(
+        meeting_id    = meeting_id,
+        token         = secrets.token_urlsafe(32),
+        created_by_id = current_user.id,
+        expires_at    = expires_at,
+        is_active     = True,
+    )
+    db.session.add(tok)
+    db.session.commit()
+    flash('Attendance link generated. Share it with meeting members.', 'success')
+    return redirect(url_for('minutes.view', meeting_id=meeting_id))
+
+
+@minutes_bp.route('/attendance-token/<int:token_id>/revoke', methods=['POST'])
+@login_required
+def revoke_attendance_token(token_id):
+    tok = AttendanceToken.query.get_or_404(token_id)
+    _check_access(tok.meeting)
+    tok.is_active = False
+    db.session.commit()
+    flash('Attendance link revoked.', 'success')
+    return redirect(url_for('minutes.view', meeting_id=tok.meeting_id))
+
+
+# ─────────────────────────── import submitted attendees ───────────────────────
+
+@minutes_bp.route('/<int:meeting_id>/import-attendees', methods=['POST'])
+@login_required
+def import_attendees(meeting_id):
+    record = MeetingMinutes.query.get_or_404(meeting_id)
+    _check_access(record)
+    submitted = MeetingAttendee.query.filter_by(meeting_id=meeting_id).all()
+    if not submitted:
+        flash('No submitted attendances to import.', 'warning')
+        return redirect(url_for('minutes.view', meeting_id=meeting_id))
+    existing = {n.strip().lower() for n in (record.attendees or '').split(',') if n.strip()}
+    new_names = []
+    for a in submitted:
+        display = a.display_name()
+        if display.lower() not in existing:
+            new_names.append(display)
+            existing.add(display.lower())
+    if new_names:
+        base       = record.attendees.rstrip(', ') if record.attendees else ''
+        record.attendees  = (base + ', ' if base else '') + ', '.join(new_names)
+        record.updated_at = datetime.utcnow()
+        db.session.commit()
+        flash(f'{len(new_names)} attendee(s) imported.', 'success')
+    else:
+        flash('All submitted attendees already listed.', 'info')
+    return redirect(url_for('minutes.view', meeting_id=meeting_id))
+
+
+# ─────────────────────────── public attendance form ───────────────────────────
+
+@minutes_bp.route('/attend/<token>', methods=['GET', 'POST'])
+@csrf.exempt
+def attend(token):
+    """Public attendance form – no login required."""
+    tok = AttendanceToken.query.filter_by(token=token).first_or_404()
+    if not tok.is_valid:
+        return render_template('minutes/attend_closed.html',
+                               reason='This attendance link has expired or been revoked.')
+    record = tok.meeting
+
+    if request.method == 'POST':
+        full_name  = (request.form.get('full_name')  or '').strip()
+        email      = (request.form.get('email')      or '').strip().lower()
+        department = (request.form.get('department') or '').strip()
+        rank       = (request.form.get('rank')       or '').strip()
+        distance   = (request.form.get('distance_km') or '').strip()
+
+        if not full_name:
+            return render_template('minutes/attend.html', tok=tok, record=record,
+                                   error='Full name is required.')
+        # Prevent duplicate submission per email
+        if email:
+            if MeetingAttendee.query.filter_by(meeting_id=record.id, email=email).first():
+                return render_template('minutes/attend.html', tok=tok, record=record,
+                                       error='You have already submitted attendance for this meeting.',
+                                       already_submitted=True)
+
+        distance_km = None
+        try:
+            if distance:
+                distance_km = float(distance)
+        except ValueError:
+            pass
+
+        attendee = MeetingAttendee(
+            meeting_id  = record.id,
+            token_id    = tok.id,
+            full_name   = full_name,
+            email       = email or None,
+            department  = department or None,
+            rank        = rank or None,
+            distance_km = distance_km,
+        )
+        db.session.add(attendee)
+
+        # Handle optional voice sample
+        voice_file = request.files.get('voice_sample')
+        if email and voice_file and voice_file.filename:
+            voice_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'voice_profiles')
+            os.makedirs(voice_dir, exist_ok=True)
+            import hashlib as _hl
+            safe_name = _hl.md5(email.encode()).hexdigest() + '.webm'
+            voice_file.save(os.path.join(voice_dir, safe_name))
+            profile = KnownAttendee.query.filter_by(email=email).first()
+            if not profile:
+                profile = KnownAttendee(email=email, full_name=full_name,
+                                        department=department, rank=rank)
+                db.session.add(profile)
+            else:
+                profile.full_name  = full_name
+                profile.department = department or profile.department
+                profile.rank       = rank or profile.rank
+                profile.updated_at = datetime.utcnow()
+            profile.has_voice_sample = True
+            profile.voice_filename   = safe_name
+        elif email:
+            profile = KnownAttendee.query.filter_by(email=email).first()
+            if not profile:
+                profile = KnownAttendee(email=email, full_name=full_name,
+                                        department=department, rank=rank)
+                db.session.add(profile)
+            else:
+                profile.full_name  = full_name
+                profile.department = department or profile.department
+                profile.rank       = rank or profile.rank
+                profile.updated_at = datetime.utcnow()
+
+        db.session.commit()
+        return render_template('minutes/attend_success.html', record=record, attendee=attendee)
+
+    return render_template('minutes/attend.html', tok=tok, record=record)
+
+
+@minutes_bp.route('/attend/profile-check', methods=['POST'])
+@csrf.exempt
+def profile_check():
+    """AJAX: Check if an email has a saved voice / profile (public, no auth)."""
+    body  = request.get_json(force=True, silent=True) or {}
+    email = (body.get('email') or '').strip().lower()
+    if not email:
+        return jsonify({'known': False})
+    profile = KnownAttendee.query.filter_by(email=email).first()
+    if not profile:
+        return jsonify({'known': False})
+    return jsonify({
+        'known':            True,
+        'full_name':        profile.full_name,
+        'department':       profile.department or '',
+        'rank':             profile.rank or '',
+        'has_voice_sample': profile.has_voice_sample,
+    })
 
 
 # ─────────────────────────── AI endpoints ───────────────────────────────────
@@ -239,50 +484,65 @@ def finalize(meeting_id):
 def api_generate_minutes():
     """Generate AI-formatted minutes from a transcript (AJAX)."""
     try:
-        body = request.get_json(force=True, silent=True) or {}
-        transcript       = (body.get('transcript') or '').strip()
-        title            = (body.get('title') or 'Meeting').strip()
-        meeting_date_str = (body.get('meeting_date') or '').strip()
-        venue            = (body.get('venue') or '').strip()
-        chairperson      = (body.get('chairperson') or '').strip()
-        attendees        = (body.get('attendees') or '').strip()
-        agenda           = (body.get('agenda') or '').strip()
+        body             = request.get_json(force=True, silent=True) or {}
+        transcript       = (body.get('transcript')    or '').strip()
+        title            = (body.get('title')         or 'Meeting').strip()
+        meeting_date_str = (body.get('meeting_date')  or '').strip()
+        meeting_time_str = (body.get('meeting_time')  or '').strip()
+        venue            = (body.get('venue')         or '').strip()
+        chairperson      = (body.get('chairperson')   or '').strip()
+        attendees        = (body.get('attendees')     or '').strip()
+        agenda           = (body.get('agenda')        or '').strip()
         meeting_id       = body.get('meeting_id')
 
         if not transcript:
             return jsonify({'error': 'Transcript is empty. Please add some meeting notes or record audio first.'}), 400
 
+        # Build known-speaker hints from submitted attendees
+        speaker_hints = ''
+        if meeting_id:
+            submitted = MeetingAttendee.query.filter_by(meeting_id=int(meeting_id)).all()
+            if submitted:
+                names = [a.display_name() for a in submitted]
+                speaker_hints = (
+                    'Known meeting participants (use these names to attribute speaker contributions): '
+                    + ', '.join(names) + '.'
+                )
+
+        def _val(v): return v if v else 'Not specified'
+
         system_prompt = (
-            "You are an expert professional secretary specializing in preparing formal, "
-            "well-structured meeting minutes for academic/university settings. "
-            "Your output must be clean Markdown with proper headings, numbered lists, "
-            "bold names, and action items clearly separated. Be thorough but concise."
+            'You are an expert professional secretary specialising in preparing formal, '
+            'well-structured meeting minutes for academic/university settings. '
+            'Your output must be clean Markdown with proper headings, numbered lists, '
+            'bold names, and action items clearly separated.\n'
+            'IMPORTANT RULES:\n'
+            '- Do NOT use placeholder text like "[to be inserted]", "[unknown]", or similar.\n'
+            '- If a field value is "Not specified", omit that line from the header block entirely.\n'
+            '- Attribute contributions to specific speakers by name wherever the transcript makes it identifiable.\n'
+            '- Be thorough but concise.'
         )
 
-        context = f"""Meeting Title  : {title}
-Date           : {meeting_date_str}
-Venue          : {venue}
-Chairperson    : {chairperson}
-Attendees      : {attendees}
-Agenda         : {agenda}
+        context = (
+            f'Meeting Title : {_val(title)}\n'
+            f'Date          : {_val(meeting_date_str)}\n'
+            + (f'Time          : {meeting_time_str}\n' if meeting_time_str else '')
+            + (f'Venue         : {venue}\n' if venue else '')
+            + (f'Chairperson   : {chairperson}\n' if chairperson else '')
+            + (f'Attendees     : {attendees}\n' if attendees else '')
+            + (f'Agenda        : {agenda}\n' if agenda else '')
+            + (f'{speaker_hints}\n' if speaker_hints else '')
+            + f'\n--- RAW TRANSCRIPT ---\n{transcript}\n--- END TRANSCRIPT ---\n\n'
+            'Please produce:\n'
+            '1. A **formal Minutes of Meeting** document (header block, numbered agenda items, discussions, resolutions).\n'
+            '2. A clearly labelled **Action Items** table: # | Action | Responsible | Deadline.\n'
+            '3. A **Closing** section noting date/time and Chairperson.\n\n'
+            'Format everything in professional Markdown.'
+        )
 
---- RAW TRANSCRIPT ---
-{transcript}
---- END TRANSCRIPT ---
-
-Please produce:
-1. A **formal Minutes of Meeting** document (with numbered agenda items, discussions, resolutions).
-2. A clearly labelled **Action Items** table at the bottom with columns: #, Action, Responsible, Deadline.
-3. A **Closing** section with date/time and Chairperson's name.
-
-Format everything in professional Markdown."""
-
-        ai_text = call_openrouter(system_prompt, context, temperature=0.3)
-
-        # Extract action items as JSON for DB storage
+        ai_text           = call_openrouter(system_prompt, context, temperature=0.3)
         action_items_json = _extract_action_items(ai_text)
 
-        # Persist if meeting_id provided
         if meeting_id:
             record = MeetingMinutes.query.get(int(meeting_id))
             if record and (record.created_by_id == current_user.id
@@ -295,7 +555,7 @@ Format everything in professional Markdown."""
         return jsonify({'minutes': ai_text, 'action_items': action_items_json})
 
     except Exception as exc:
-        current_app.logger.error(f"api_generate_minutes error: {exc}", exc_info=True)
+        current_app.logger.error(f'api_generate_minutes error: {exc}', exc_info=True)
         return jsonify({'error': str(exc)}), 500
 
 
@@ -357,7 +617,6 @@ def export_pdf(meeting_id):
 
 def _check_access(record: MeetingMinutes):
     """Abort with 403 if current user has no access to this record."""
-    from flask import abort
     if (record.created_by_id != current_user.id
             and current_user.role not in ('admin', 'hod')):
         abort(403)

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance Submitted</title>
+  <script src="{{ url_for('static', filename='css/tailwind.min.js') }}"></script>
+  <link href="{{ url_for('static', filename='css/remixicon.css') }}" rel="stylesheet">
+  <script>tailwind.config={theme:{extend:{colors:{primary:{50:'#f0f9ff',600:'#0284c7',700:'#0369a1'}}}}}</script>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 flex items-center justify-center p-4">
+  <div class="w-full max-w-md text-center">
+    <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-5">
+      <i class="ri-checkbox-circle-fill text-5xl text-green-500"></i>
+    </div>
+    <h1 class="text-2xl font-bold text-gray-900 mb-2">Attendance Recorded!</h1>
+    <p class="text-gray-500 mb-6">
+      Thank you, <strong>{{ attendee.display_name() }}</strong>. Your attendance for
+      <strong>{{ record.title }}</strong> has been successfully submitted.
+    </p>
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 text-left space-y-3 mb-6">
+      {% if record.meeting_date %}
+      <div class="flex items-center gap-3 text-sm">
+        <i class="ri-calendar-line text-primary-500"></i>
+        <span class="text-gray-600">{{ record.meeting_date.strftime('%A, %d %B %Y') }}</span>
+      </div>
+      {% endif %}
+      {% if record.venue %}
+      <div class="flex items-center gap-3 text-sm">
+        <i class="ri-map-pin-2-line text-primary-500"></i>
+        <span class="text-gray-600">{{ record.venue }}</span>
+      </div>
+      {% endif %}
+      {% if attendee.department %}
+      <div class="flex items-center gap-3 text-sm">
+        <i class="ri-building-line text-primary-500"></i>
+        <span class="text-gray-600">{{ attendee.department }}</span>
+      </div>
+      {% endif %}
+    </div>
+    <p class="text-xs text-gray-400">You may now close this page.</p>
+  </div>
+</body>
+</html>

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meeting Attendance – {{ record.title }}</title>
+  <script src="{{ url_for('static', filename='css/tailwind.min.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/alpine.min.js') }}"></script>
+  <link href="{{ url_for('static', filename='css/remixicon.css') }}" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: { primary: { 50:'#f0f9ff',100:'#e0f2fe',200:'#bae6fd',300:'#7dd3fc',400:'#38bdf8',500:'#0ea5e9',600:'#0284c7',700:'#0369a1',800:'#075985',900:'#0c4a6e' } } } }
+    }
+  </script>
+  <style>
+    [x-cloak]{display:none!important}
+    @keyframes pulse-ring{0%{transform:scale(.85);opacity:1}80%,100%{transform:scale(2.2);opacity:0}}
+    .pulse-ring{animation:pulse-ring 1.4s cubic-bezier(.215,.61,.355,1) infinite}
+    @keyframes wave{0%,100%{height:5px}50%{height:22px}}
+    .wave-bar{display:inline-block;width:4px;border-radius:2px;background:#0284c7;animation:wave 1s ease-in-out infinite}
+    .wave-bar:nth-child(2){animation-delay:.1s}.wave-bar:nth-child(3){animation-delay:.2s}
+    .wave-bar:nth-child(4){animation-delay:.3s}.wave-bar:nth-child(5){animation-delay:.4s}
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-sky-50 via-white to-blue-50 flex items-center justify-center p-4"
+      x-data="attendForm()" x-init="init()">
+
+  <div class="w-full max-w-lg">
+
+    <!-- University brand bar -->
+    <div class="text-center mb-6">
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-600 to-primary-700 shadow-lg mb-3">
+        <i class="ri-user-add-line text-white text-3xl"></i>
+      </div>
+      <p class="text-xs font-semibold text-primary-700 uppercase tracking-widest">Edo State University Iyamho</p>
+    </div>
+
+    <!-- Meeting info card -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-5">
+      <h1 class="text-lg font-bold text-gray-900 mb-1">{{ record.title }}</h1>
+      <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
+        {% if record.meeting_date %}
+        <span class="flex items-center gap-1"><i class="ri-calendar-line text-primary-500"></i>
+          {{ record.meeting_date.strftime('%A, %d %B %Y') }}</span>
+        {% endif %}
+        {% if record.meeting_time %}
+        <span class="flex items-center gap-1"><i class="ri-time-line text-primary-500"></i> {{ record.meeting_time }}</span>
+        {% endif %}
+        {% if record.venue %}
+        <span class="flex items-center gap-1"><i class="ri-map-pin-2-line text-primary-500"></i> {{ record.venue }}</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Error message -->
+    {% if error %}
+    <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 text-sm text-red-700">
+      <i class="ri-error-warning-line text-lg flex-shrink-0 mt-0.5"></i>
+      <span>{{ error }}</span>
+    </div>
+    {% endif %}
+
+    <!-- Attendance form -->
+    <form method="POST" enctype="multipart/form-data"
+          class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+
+      <!-- Progress bar -->
+      <div class="h-1.5 bg-gray-100">
+        <div class="h-full bg-primary-500 transition-all duration-500" :style="`width:${progress}%`"></div>
+      </div>
+
+      <div class="p-6 space-y-5">
+
+        <div>
+          <h2 class="text-base font-semibold text-gray-800 flex items-center gap-2">
+            <i class="ri-user-3-line text-primary-500"></i> Your Details
+          </h2>
+          <p class="text-xs text-gray-400 mt-0.5">Enter your email first — we'll auto-fill any previously saved information.</p>
+        </div>
+
+        <!-- Email (checked first for profile lookup) -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Email Address <span class="text-gray-400 font-normal">(recommended)</span>
+          </label>
+          <div class="relative">
+            <input type="email" name="email" x-model="email" @blur="checkProfile()"
+                   placeholder="yourname@edsu.edu.ng"
+                   class="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-primary-400 focus:border-transparent outline-none pr-10">
+            <div class="absolute right-3 top-1/2 -translate-y-1/2">
+              <i x-show="checkingProfile" class="ri-loader-4-line animate-spin text-gray-400"></i>
+              <i x-show="profileKnown && !checkingProfile" class="ri-checkbox-circle-fill text-green-500" title="Profile found – details auto-filled"></i>
+            </div>
+          </div>
+          <p x-show="profileKnown && !checkingProfile" class="mt-1 text-xs text-green-600 flex items-center gap-1">
+            <i class="ri-magic-line"></i> Your details have been auto-filled from a previous meeting.
+          </p>
+        </div>
+
+        <!-- Rank -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Title / Rank</label>
+          <select name="rank" x-model="rank"
+                  class="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-primary-400 focus:border-transparent outline-none">
+            <option value="">-- Select --</option>
+            <option>Prof.</option>
+            <option>Dr.</option>
+            <option>Mr.</option>
+            <option>Mrs.</option>
+            <option>Ms.</option>
+            <option>Engr.</option>
+            <option>Barr.</option>
+          </select>
+        </div>
+
+        <!-- Full Name -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Full Name <span class="text-red-500">*</span>
+          </label>
+          <input type="text" name="full_name" x-model="fullName" required
+                 placeholder="e.g. Adesola Kehinde"
+                 class="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-primary-400 focus:border-transparent outline-none">
+        </div>
+
+        <!-- Department -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Department / Unit</label>
+          <input type="text" name="department" x-model="department"
+                 placeholder="e.g. Computer Science"
+                 class="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-primary-400 focus:border-transparent outline-none">
+        </div>
+
+        <!-- Distance from initiator -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Distance from Meeting Organiser <span class="text-gray-400 font-normal">(km, optional)</span>
+          </label>
+          <input type="number" name="distance_km" step="0.1" min="0"
+                 placeholder="e.g. 12.5"
+                 class="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-primary-400 focus:border-transparent outline-none">
+        </div>
+
+        <!-- ──── Voice recognition section ──── -->
+        <div x-show="!voiceSkipped" class="rounded-xl border border-dashed border-primary-200 bg-primary-50/50 p-5 space-y-4">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h3 class="text-sm font-semibold text-primary-800 flex items-center gap-2">
+                <i class="ri-mic-2-line text-primary-600"></i> Voice Introduction
+                <span class="text-xs font-normal bg-primary-100 text-primary-600 px-2 py-0.5 rounded-full">Optional</span>
+              </h3>
+              <p class="text-xs text-primary-600 mt-1">
+                Recording your voice helps the AI identify <em>who said what</em> when generating the meeting minutes.
+                You only need to do this once — future forms will recognise your email and skip this step.
+              </p>
+            </div>
+          </div>
+
+          <!-- Voice already registered notice -->
+          <div x-show="profileKnown && hasVoiceSample"
+               class="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+            <i class="ri-checkbox-circle-fill text-green-500 flex-shrink-0"></i>
+            <span>Your voice is already registered. Attendance only — no new recording needed.</span>
+          </div>
+
+          <!-- Recorder (hidden when voice already registered) -->
+          <div x-show="!(profileKnown && hasVoiceSample)">
+            <!-- Browser support warning -->
+            <div x-show="!mediaSupported" class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800 flex items-start gap-2 mb-3">
+              <i class="ri-alert-line mt-0.5 flex-shrink-0"></i>
+              <span>Audio recording not supported in this browser. Use Chrome or Edge for the best experience.</span>
+            </div>
+
+            <div class="flex flex-col items-center gap-3 py-4" x-show="mediaSupported">
+              <!-- Record button -->
+              <div class="relative">
+                <div x-show="isRecording" class="absolute inset-0 rounded-full bg-red-400 pulse-ring"></div>
+                <button type="button" @click="toggleRecording()"
+                        :class="isRecording
+                          ? 'bg-red-500 hover:bg-red-600 shadow-red-200'
+                          : 'bg-primary-600 hover:bg-primary-700 shadow-primary-200'"
+                        class="relative w-16 h-16 rounded-full flex items-center justify-center text-white shadow-lg transition-all duration-200">
+                  <i :class="isRecording ? 'ri-stop-fill' : 'ri-mic-fill'" class="text-2xl"></i>
+                </button>
+              </div>
+
+              <!-- Status -->
+              <div class="text-center text-sm">
+                <div x-show="isRecording" class="flex items-center gap-2 text-red-600 font-medium">
+                  <span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span>
+                  <span class="wave-bar"></span><span class="wave-bar"></span>
+                  <span class="ml-1">Recording… <span x-text="recTime"></span></span>
+                </div>
+                <div x-show="!isRecording && !audioBlob" class="text-gray-400">
+                  Tap to record a short voice introduction (~10–30 sec)
+                </div>
+                <div x-show="audioBlob && !isRecording" class="flex items-center gap-2 text-green-600 font-medium">
+                  <i class="ri-checkbox-circle-fill"></i> Voice recorded — ready to submit
+                  <button type="button" @click="clearAudio()" class="text-xs text-gray-400 hover:text-red-500 underline ml-1">Re-record</button>
+                </div>
+              </div>
+
+              <!-- Playback -->
+              <audio x-show="audioBlob && !isRecording" :src="audioURL" controls
+                     class="w-full max-w-xs h-10 rounded-lg"></audio>
+            </div>
+
+            <!-- Hidden file input for the audio blob -->
+            <input type="file" name="voice_sample" id="voiceInput" class="hidden" accept="audio/*">
+          </div>
+        </div>
+
+        <!-- Submit -->
+        <button type="submit" @click="prepareSubmit()"
+                :disabled="!fullName.trim()"
+                class="w-full py-3 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl shadow transition-colors flex items-center justify-center gap-2">
+          <i class="ri-check-line"></i> Submit Attendance
+        </button>
+      </div>
+    </form>
+
+    <p class="text-center text-xs text-gray-400 mt-4">
+      Secured by EDSU Result Processing System &bull; Your data is used only for meeting records.
+    </p>
+  </div>
+
+<script>
+function attendForm() {
+  return {
+    email:           '',
+    fullName:        '',
+    department:      '',
+    rank:            '',
+    checkingProfile: false,
+    profileKnown:    false,
+    hasVoiceSample:  false,
+    voiceSkipped:    false,
+
+    isRecording: false,
+    audioBlob:   null,
+    audioURL:    '',
+    mediaSupported: false,
+    recTime:     '0:00',
+    _recorder:   null,
+    _chunks:     [],
+    _timerInt:   null,
+    _seconds:    0,
+
+    get progress() {
+      let score = 0;
+      if (this.email)      score += 20;
+      if (this.fullName)   score += 30;
+      if (this.department) score += 20;
+      if (this.rank)       score += 15;
+      if (this.audioBlob || this.hasVoiceSample) score += 15;
+      return Math.min(score, 100);
+    },
+
+    init() {
+      this.mediaSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    },
+
+    async checkProfile() {
+      const email = this.email.trim().toLowerCase();
+      if (!email || !email.includes('@')) return;
+      this.checkingProfile = true;
+      try {
+        const resp = await fetch('/minutes/attend/profile-check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await resp.json();
+        this.profileKnown   = data.known;
+        this.hasVoiceSample = data.has_voice_sample || false;
+        if (data.known) {
+          if (!this.fullName)   this.fullName   = data.full_name   || '';
+          if (!this.department) this.department = data.department  || '';
+          if (!this.rank)       this.rank       = data.rank        || '';
+        }
+      } catch(e) { /* silent */ }
+      finally { this.checkingProfile = false; }
+    },
+
+    async toggleRecording() {
+      this.isRecording ? this.stopRecording() : await this.startRecording();
+    },
+
+    async startRecording() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mime   = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
+        this._chunks  = [];
+        this._recorder = new MediaRecorder(stream, { mimeType: mime });
+        this._recorder.ondataavailable = e => { if (e.data.size) this._chunks.push(e.data); };
+        this._recorder.onstop = () => {
+          this.audioBlob = new Blob(this._chunks, { type: mime });
+          this.audioURL  = URL.createObjectURL(this.audioBlob);
+          stream.getTracks().forEach(t => t.stop());
+          // Attach to hidden file input
+          const dt   = new DataTransfer();
+          const file = new File([this.audioBlob], 'voice_intro.webm', { type: mime });
+          dt.items.add(file);
+          document.getElementById('voiceInput').files = dt.files;
+        };
+        this._recorder.start(200);
+        this.isRecording = true;
+        this._seconds    = 0;
+        this._timerInt   = setInterval(() => {
+          this._seconds++;
+          const m = Math.floor(this._seconds / 60);
+          const s = String(this._seconds % 60).padStart(2, '0');
+          this.recTime = `${m}:${s}`;
+          if (this._seconds >= 60) this.stopRecording(); // cap at 60s
+        }, 1000);
+      } catch(e) {
+        alert('Could not access microphone: ' + e.message);
+      }
+    },
+
+    stopRecording() {
+      if (this._recorder && this._recorder.state !== 'inactive') this._recorder.stop();
+      this.isRecording = false;
+      clearInterval(this._timerInt);
+    },
+
+    clearAudio() {
+      this.audioBlob = null;
+      this.audioURL  = '';
+      this._chunks   = [];
+      document.getElementById('voiceInput').value = '';
+    },
+
+    prepareSubmit() {
+      // Ensure any active recording is stopped before form submits
+      if (this.isRecording) this.stopRecording();
+    }
+  };
+}
+</script>
+</body>
+</html>

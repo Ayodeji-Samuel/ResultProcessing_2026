@@ -24,7 +24,7 @@
 
 {% block content %}
 <div class="max-w-4xl mx-auto space-y-6"
-     x-data="minutesRecorder()" x-init="init()">
+     x-data="minutesRecorder({{ (record.raw_transcript or '')|tojson if record else '""' }})" x-init="init()">
 
   <!-- Header -->
   <div class="flex items-center gap-4">
@@ -40,9 +40,12 @@
     </div>
   </div>
 
-  <form method="POST" id="minutesForm" action="{{ url_for('minutes.new') }}">
+  {# ── After saving: form posts to edit endpoint; otherwise to new ── #}
+  <form method="POST" id="minutesForm"
+        action="{% if record %}{{ url_for('minutes.edit', meeting_id=record.id) }}{% else %}{{ url_for('minutes.new') }}{% endif %}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="transcript" x-model="transcript">
+    {% if record %}<input type="hidden" name="_source" value="new">{% endif %}
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -56,6 +59,7 @@
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Title <span class="text-red-500">*</span></label>
             <input type="text" name="title" required
+                   value="{{ record.title if record else '' }}"
                    placeholder="Department Staff Meeting..."
                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none">
           </div>
@@ -63,25 +67,31 @@
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Date <span class="text-red-500">*</span></label>
-              <input type="date" name="meeting_date" required value="{{ today }}"
+              <input type="date" name="meeting_date" required
+                     value="{% if record %}{{ record.meeting_date.isoformat() }}{% else %}{{ today }}{% endif %}"
                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none">
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Time</label>
               <input type="time" name="meeting_time"
+                     value="{{ record.meeting_time if record else '' }}"
                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none">
             </div>
           </div>
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Venue</label>
-            <input type="text" name="venue" placeholder="Senate Chamber, Block A..."
+            <input type="text" name="venue"
+                   value="{{ record.venue if record else '' }}"
+                   placeholder="Senate Chamber, Block A..."
                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none">
           </div>
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Chairperson</label>
-            <input type="text" name="chairperson" placeholder="Prof. John Doe"
+            <input type="text" name="chairperson"
+                   value="{{ record.chairperson if record else '' }}"
+                   placeholder="Prof. John Doe"
                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none">
           </div>
 
@@ -89,20 +99,56 @@
             <label class="block text-sm font-medium text-gray-700 mb-1">Attendees</label>
             <textarea name="attendees" rows="3"
                       placeholder="Dr. Jane Smith, Mr. Ali Hassan, ..."
-                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none resize-none"></textarea>
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none resize-none">{{ record.attendees if record else '' }}</textarea>
           </div>
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Agenda</label>
             <textarea name="agenda" rows="4"
                       placeholder="1. Opening prayer&#10;2. Confirmation of last minutes&#10;3. Matters arising&#10;..."
-                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none resize-none"></textarea>
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none resize-none">{{ record.agenda if record else '' }}</textarea>
           </div>
         </div>
       </div>
 
       <!-- ──────── Right column: Recording & Transcript ──────── -->
       <div class="lg:col-span-2 space-y-5">
+
+        <!-- ── Attendance Link (shown immediately after meeting is saved) ── -->
+        {% if record and token %}
+        <div class="bg-teal-50 border border-teal-300 rounded-xl p-5">
+          <div class="flex items-start gap-3 mb-3">
+            <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-teal-100 rounded-full">
+              <i class="ri-links-line text-teal-600 text-lg"></i>
+            </div>
+            <div>
+              <h3 class="font-semibold text-teal-900 text-sm">Attendance Link Ready</h3>
+              <p class="text-xs text-teal-700 mt-0.5">Share this link with members so they can sign in while the meeting is in progress.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <input id="att-link-input" type="text" readonly
+                   value="{{ host_url }}{{ url_for('minutes.attend', token=token.token) }}"
+                   class="flex-1 px-3 py-2 bg-white border border-teal-300 rounded-lg text-sm text-gray-700 cursor-pointer focus:outline-none"
+                   onclick="this.select();document.execCommand('copy');
+                            const b=document.getElementById('att-copied');
+                            b.classList.remove('hidden');setTimeout(()=>b.classList.add('hidden'),2500)">
+            <button type="button"
+                    onclick="const v=document.getElementById('att-link-input').value;
+                             navigator.clipboard.writeText(v);
+                             const b=document.getElementById('att-copied');
+                             b.classList.remove('hidden');setTimeout(()=>b.classList.add('hidden'),2500)"
+                    class="flex-shrink-0 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5">
+              <i class="ri-clipboard-line"></i> Copy
+            </button>
+            <a href="{{ url_for('minutes.view', meeting_id=record.id) }}"
+               class="flex-shrink-0 px-3 py-2 bg-white border border-teal-300 hover:bg-teal-50 text-teal-700 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5">
+              <i class="ri-eye-line"></i> View Meeting
+            </a>
+          </div>
+          <span id="att-copied" class="hidden text-xs text-teal-700 font-medium mt-1.5 block">&#10003; Link copied to clipboard!</span>
+        </div>
+        {% endif %}
 
         <!-- Voice Recorder Card -->
         <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
@@ -182,7 +228,7 @@
           </a>
           <button type="submit"
                   class="inline-flex items-center gap-2 px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg shadow transition-colors">
-            <i class="ri-save-line"></i> Save Meeting
+            <i class="ri-save-line"></i> {% if record %}Update Meeting{% else %}Save Meeting{% endif %}
           </button>
         </div>
       </div>
@@ -193,11 +239,11 @@
 
 {% block scripts %}
 <script>
-function minutesRecorder() {
+function minutesRecorder(initialTranscript) {
   return {
     isRecording:    false,
     speechSupported: false,
-    transcript:     '',
+    transcript:     initialTranscript || '',
     interimText:    '',
     isEnhancing:    false,
     recordingTime:  '00:00',
