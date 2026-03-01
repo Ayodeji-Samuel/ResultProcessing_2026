@@ -190,7 +190,11 @@
                 <div>
                     <p class="font-medium text-sm">Your Role</p>
                     <p class="text-primary-100 text-xs mt-1">
-                        {{ 'Head of Department' if current_user.role == 'hod' else 'Level Adviser' }}
+                        {% if current_user.role == 'admin' %}Administrator
+                        {% elif current_user.role == 'hod' %}Head of Department
+                        {% elif current_user.role == 'level_adviser' %}Level Adviser
+                        {% elif current_user.role == 'lecturer' %}Lecturer
+                        {% else %}{{ current_user.role|capitalize }}{% endif %}
                     </p>
                 </div>
             </div>

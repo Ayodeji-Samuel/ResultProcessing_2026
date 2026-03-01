@@ -50,17 +50,25 @@
                         <span class="text-sm text-gray-600">{{ user.email }}</span>
                     </td>
                     <td class="px-6 py-4">
-                        {% if user.role == 'hod' %}
+                        {% if user.role == 'admin' %}
                         <span class="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-bold flex items-center w-fit">
+                            <i class="ri-admin-line mr-1"></i>Administrator
+                        </span>
+                        {% elif user.role == 'hod' %}
+                        <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs font-bold flex items-center w-fit">
                             <i class="ri-vip-crown-line mr-1"></i>Head of Department
+                        </span>
+                        {% elif user.role == 'level_adviser' %}
+                        <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-bold flex items-center w-fit">
+                            <i class="ri-user-star-line mr-1"></i>Level Adviser
                         </span>
                         {% elif user.role == 'lecturer' %}
                         <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-bold flex items-center w-fit">
                             <i class="ri-user-line mr-1"></i>Lecturer
                         </span>
                         {% else %}
-                        <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-bold flex items-center w-fit">
-                            <i class="ri-user-star-line mr-1"></i>Level Adviser
+                        <span class="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-bold flex items-center w-fit">
+                            <i class="ri-user-line mr-1"></i>{{ user.role|capitalize }}
                         </span>
                         {% endif %}
                     </td>
