@@ -1,5 +1,10 @@
 import os
 from datetime import timedelta
+from dotenv import load_dotenv
+
+# Load .env as early as possible — before any class attribute is evaluated.
+# This ensures DATABASE_URL, SECRET_KEY etc. are present when Config is built.
+load_dotenv(override=False)  # Don't override vars already set in the environment
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
