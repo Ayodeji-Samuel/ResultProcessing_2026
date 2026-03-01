@@ -357,7 +357,7 @@ class AuditLog(db.Model):
     browser = db.Column(db.String(64))
     operating_system = db.Column(db.String(64))
     location = db.Column(db.String(128))  # City/Country if available
-    session_id = db.Column(db.String(64))  # Track session
+    session_id = db.Column(db.String(256))  # Track session (Flask tokens can be 100-200 chars)
     status = db.Column(db.String(16), default='success')  # success, failed, blocked
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -446,3 +446,78 @@ class MeetingMinutes(db.Model):
 
     def __repr__(self):
         return f'<MeetingMinutes {self.id} - {self.title}>'
+
+
+class KnownAttendee(db.Model):
+    """Reusable voice profile per email address.
+    Once a person records their voice on any attendance form, subsequent
+    forms skip the recording step and auto-fill their details."""
+    __tablename__ = 'known_attendees'
+
+    id            = db.Column(db.Integer, primary_key=True)
+    email         = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    full_name     = db.Column(db.String(128), nullable=False)
+    department    = db.Column(db.String(128))
+    rank          = db.Column(db.String(64))          # Prof., Dr., Mr., Mrs., etc.
+    has_voice_sample = db.Column(db.Boolean, default=False)
+    voice_filename   = db.Column(db.String(256))      # path under uploads/voice_profiles/
+    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at    = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<KnownAttendee {self.email}>'
+
+
+class AttendanceToken(db.Model):
+    """One-use link that lets anyone submit attendance for a specific meeting.
+    The organiser can revoke it at any time; it also auto-expires at meeting end."""
+    __tablename__ = 'attendance_tokens'
+
+    id            = db.Column(db.Integer, primary_key=True)
+    meeting_id    = db.Column(db.Integer, db.ForeignKey('meeting_minutes.id', ondelete='CASCADE'), nullable=False)
+    token         = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    expires_at    = db.Column(db.DateTime)            # NULL = no hard expiry (manual revoke only)
+    is_active     = db.Column(db.Boolean, default=True)
+    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    meeting    = db.relationship('MeetingMinutes', backref=db.backref('tokens', cascade='all,delete-orphan'))
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    attendees  = db.relationship('MeetingAttendee', backref='token', cascade='all,delete-orphan')
+
+    @property
+    def is_valid(self):
+        if not self.is_active:
+            return False
+        if self.expires_at and self.expires_at < datetime.utcnow():
+            return False
+        return True
+
+    def __repr__(self):
+        return f'<AttendanceToken {self.token[:8]}... meeting={self.meeting_id}>'
+
+
+class MeetingAttendee(db.Model):
+    """One attendance record submitted via the public attendance form."""
+    __tablename__ = 'meeting_attendees'
+
+    id            = db.Column(db.Integer, primary_key=True)
+    meeting_id    = db.Column(db.Integer, db.ForeignKey('meeting_minutes.id', ondelete='CASCADE'), nullable=False)
+    token_id      = db.Column(db.Integer, db.ForeignKey('attendance_tokens.id', ondelete='SET NULL'))
+    full_name     = db.Column(db.String(128), nullable=False)
+    email         = db.Column(db.String(120))
+    department    = db.Column(db.String(128))
+    rank          = db.Column(db.String(64))
+    distance_km   = db.Column(db.Float)               # distance from meeting initiator (km)
+    submitted_at  = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationship
+    meeting       = db.relationship('MeetingMinutes', backref=db.backref('submitted_attendees', cascade='all,delete-orphan'))
+
+    def display_name(self):
+        prefix = f"{self.rank} " if self.rank else ""
+        return f"{prefix}{self.full_name}"
+
+    def __repr__(self):
+        return f'<MeetingAttendee {self.full_name} meeting={self.meeting_id}>'
