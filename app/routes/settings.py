@@ -1,11 +1,15 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, send_file, current_app
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from app import db
-from app.models import GradingSystem, SystemSetting
-from app.routes.auth import hod_required, admin_or_hod_required
+from app.models import GradingSystem, SystemSetting, AuditLog
+from app.routes.auth import hod_required, admin_or_hod_required, admin_required
 from config import Config
 import os
+import io
+import subprocess
+import shutil
+from datetime import datetime
 
 settings_bp = Blueprint('settings', __name__)
 
@@ -137,7 +141,9 @@ def delete_logo():
 @admin_or_hod_required
 def system():
     """System settings"""
+    from app.models import AcademicSession
     settings = {s.key: s.value for s in SystemSetting.query.all()}
+    sessions = AcademicSession.query.order_by(AcademicSession.session_name.desc()).all()
     # Determine the current database dialect (sqlite, mysql, postgresql, etc.)
     db_info = {
         'dialect': db.engine.dialect.name,
@@ -149,9 +155,126 @@ def system():
         clear_url = url_for('settings.clear_old_data')
     except Exception:
         clear_url = None
-    
+
+    # Backup is admin-only
+    backup_url = url_for('settings.backup_database') if current_user.role == 'admin' else None
+
     return render_template('settings/system.html', settings=settings,
-                           db_info=db_info, clear_url=clear_url)
+                           sessions=sessions, config=Config,
+                           db_info=db_info, clear_url=clear_url,
+                           backup_url=backup_url)
+
+
+@settings_bp.route('/system/backup')
+@login_required
+@admin_required
+def backup_database():
+    """Download a full database backup (admin only)."""
+    timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+    dialect = db.engine.dialect.name
+
+    # --- SQLite ---
+    if dialect == 'sqlite':
+        db_url = str(db.engine.url)
+        # Strip the sqlite:/// prefix to get the file path
+        db_path = db_url.replace('sqlite:///', '').replace('sqlite://', '')
+        if not os.path.isabs(db_path):
+            db_path = os.path.join(current_app.root_path, '..', db_path)
+        db_path = os.path.normpath(db_path)
+
+        if not os.path.exists(db_path):
+            flash('Database file not found.', 'danger')
+            return redirect(url_for('settings.system'))
+
+        # Copy to a temp buffer so the live file is not locked during transfer
+        buf = io.BytesIO()
+        with open(db_path, 'rb') as f:
+            shutil.copyfileobj(f, buf)
+        buf.seek(0)
+
+        filename = f'results_backup_{timestamp}.db'
+        _log_backup(dialect, filename)
+        return send_file(
+            buf,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/octet-stream'
+        )
+
+    # --- PostgreSQL / MySQL (pg_dump / mysqldump) ---
+    elif dialect in ('postgresql', 'mysql'):
+        db_url_str = str(db.engine.url)
+
+        if dialect == 'postgresql':
+            dump_cmd = ['pg_dump', '--format=custom', db_url_str]
+            extension = 'dump'
+            mimetype = 'application/octet-stream'
+        else:
+            # Decompose URL for mysqldump flags
+            u = db.engine.url
+            dump_cmd = [
+                'mysqldump',
+                f'--host={u.host}', f'--port={u.port or 3306}',
+                f'--user={u.username}', f'--password={u.password}',
+                u.database
+            ]
+            extension = 'sql'
+            mimetype = 'text/plain'
+
+        filename = f'results_backup_{timestamp}.{extension}'
+
+        try:
+            result = subprocess.run(
+                dump_cmd,
+                capture_output=True,
+                timeout=120
+            )
+        except FileNotFoundError:
+            tool = 'pg_dump' if dialect == 'postgresql' else 'mysqldump'
+            flash(f'{tool} executable not found on server. Install the database client tools.', 'danger')
+            return redirect(url_for('settings.system'))
+        except subprocess.TimeoutExpired:
+            flash('Database dump timed out. The database may be too large; contact your sysadmin.', 'danger')
+            return redirect(url_for('settings.system'))
+
+        if result.returncode != 0:
+            error_msg = result.stderr.decode('utf-8', errors='replace')[:200]
+            flash(f'Database dump failed: {error_msg}', 'danger')
+            return redirect(url_for('settings.system'))
+
+        buf = io.BytesIO(result.stdout)
+        buf.seek(0)
+
+        _log_backup(dialect, filename)
+        return send_file(
+            buf,
+            as_attachment=True,
+            download_name=filename,
+            mimetype=mimetype
+        )
+
+    else:
+        flash(f'Backup not supported for database dialect: {dialect}.', 'warning')
+        return redirect(url_for('settings.system'))
+
+
+def _log_backup(dialect: str, filename: str):
+    """Write a backup audit-log entry."""
+    try:
+        entry = AuditLog(
+            user_id=current_user.id,
+            username=current_user.username,
+            action='DATABASE_BACKUP',
+            action_category='SETTINGS',
+            resource='database',
+            details=f'Admin downloaded database backup ({dialect}): {filename}',
+            ip_address=request.remote_addr,
+            status='success'
+        )
+        db.session.add(entry)
+        db.session.commit()
+    except Exception:
+        pass  # Never block a download because of a log failure
 
 
 @settings_bp.route('/system/update', methods=['POST'])
