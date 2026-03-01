@@ -175,7 +175,7 @@
                     </tr>
                     <tr>
                         <td class="text-muted">Database:</td>
-                        <td>SQLite</td>
+                        <td>{{ db_info.dialect|capitalize }}{% if db_info.driver %} ({{ db_info.driver }}){% endif %}</td>
                     </tr>
                     <tr>
                         <td class="text-muted">Framework:</td>
@@ -195,9 +195,11 @@
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
+                    {% if clear_url %}
                     <button type="button" class="btn btn-outline-warning btn-sm" onclick="clearOldData()">
                         <i class="bi bi-trash"></i> Clear Old Sessions
                     </button>
+                    {% endif %}
                 </div>
                 <p class="text-muted small mt-2 mb-0">
                     Regular backups are recommended. Clear old sessions to optimize database.
@@ -224,7 +226,7 @@
         </div>
     </div>
 </div>
-
+{% if clear_url %}
 <!-- Clear Old Data Modal -->
 <div class="modal fade" id="clearModal" tabindex="-1">
     <div class="modal-dialog">
@@ -255,10 +257,12 @@
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
+{% if clear_url %}
 function clearOldData() {
     new bootstrap.Modal(document.getElementById('clearModal')).show();
 }
@@ -268,7 +272,8 @@ document.getElementById('confirmClear').addEventListener('change', function() {
 });
 
 function performClear() {
-    window.location.href = "{{ url_for('settings.clear_old_data') }}";
+    window.location.href = "{{ clear_url }}";
 }
+{% endif %}
 </script>
 {% endblock %}

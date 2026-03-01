@@ -5,6 +5,14 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'your-secret-key-change-in-production-2026'
+    # Database URI. By default we use SQLite for development, but the
+    # connection string can be overridden via the DATABASE_URL environment
+    # variable (ideally set in a .env file). For production it is expected that
+    # a real database such as MySQL/PostgreSQL will be used, e.g.:
+    #
+    #   DATABASE_URL=mysql+mysqldb://user:password@host:port/dbname
+    #
+    # Note: the package mysqlclient must be installed for the mysqldb driver.
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
         'sqlite:///' + os.path.join(basedir, 'instance', 'results.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False

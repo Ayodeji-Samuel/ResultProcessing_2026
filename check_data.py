@@ -21,12 +21,11 @@ with app.app_context():
     if current:
         print(f'\nData for current session ({current.session_name}):')
         print(f'  Students: {Student.query.filter_by(session_id=current.id).count()}')
-        print(f'  Courses: {Course.query.filter_by(session_id=current.id).count()}')
+        # Courses are not session-scoped; count all active courses instead
+        print(f'  Active Courses: {Course.query.filter_by(is_active=True).count()}')
         
-        # Get results count for current session
-        results_count = db.session.query(Result).join(Course).filter(
-            Course.session_id == current.id
-        ).count()
+        # Get results count for current session (Result has its own session_id)
+        results_count = Result.query.filter_by(session_id=current.id).count()
         print(f'  Results: {results_count}')
         
         # Show some sample data
@@ -36,6 +35,6 @@ with app.app_context():
             print(f'  {st.matric_number} - {st.surname} {st.first_name} ({st.level} Level)')
         
         print(f'\n=== Sample Courses ===')
-        courses = Course.query.filter_by(session_id=current.id).limit(5).all()
+        courses = Course.query.filter_by(is_active=True).limit(5).all()
         for c in courses:
             print(f'  {c.course_code} - {c.course_title} ({c.level} Level)')

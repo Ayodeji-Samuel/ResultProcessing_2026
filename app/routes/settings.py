@@ -138,8 +138,20 @@ def delete_logo():
 def system():
     """System settings"""
     settings = {s.key: s.value for s in SystemSetting.query.all()}
+    # Determine the current database dialect (sqlite, mysql, postgresql, etc.)
+    db_info = {
+        'dialect': db.engine.dialect.name,
+        'driver': db.engine.dialect.driver
+    }
+    # Attempt to build a URL for clearing old data; feature may not be implemented
+    from flask import url_for
+    try:
+        clear_url = url_for('settings.clear_old_data')
+    except Exception:
+        clear_url = None
     
-    return render_template('settings/system.html', settings=settings)
+    return render_template('settings/system.html', settings=settings,
+                           db_info=db_info, clear_url=clear_url)
 
 
 @settings_bp.route('/system/update', methods=['POST'])
