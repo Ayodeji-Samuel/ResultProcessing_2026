@@ -48,13 +48,17 @@ def create_app(config_name='default'):
     app.register_blueprint(settings_bp, url_prefix='/settings')
     app.register_blueprint(minutes_bp, url_prefix='/minutes')
 
-    # Landing page route (public)
-    from flask import render_template
+    # Landing page — root URL (public)
+    from flask import render_template, redirect, url_for
 
-    @app.route('/landing')
+    @app.route('/')
     def landing():
         return render_template('landing.html')
-    
+
+    @app.route('/landing')
+    def landing_redirect():
+        return redirect(url_for('landing'), 301)
+
     # Create database tables
     with app.app_context():
         db.create_all()
