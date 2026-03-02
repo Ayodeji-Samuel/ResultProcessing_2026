@@ -86,16 +86,11 @@ def create_app(config_name='default'):
                 ('MSc', 'A', 70, 100, 5),
                 ('MSc', 'B', 60, 69, 4),
                 ('MSc', 'C', 50, 59, 3),
-                ('MSc', 'D', 45, 49, 2),
-                ('MSc', 'E', 40, 44, 1),
-                ('MSc', 'F', 0, 39, 0),
+                ('MSc', 'F', 0, 49, 0),
                 # PhD Grading
                 ('PhD', 'A', 70, 100, 5),
                 ('PhD', 'B', 60, 69, 4),
-                ('PhD', 'C', 50, 59, 3),
-                ('PhD', 'D', 45, 49, 2),
-                ('PhD', 'E', 40, 44, 1),
-                ('PhD', 'F', 0, 39, 0),
+                ('PhD', 'F', 0, 59, 0),
             ]
             for degree, grade, min_score, max_score, points in default_grades:
                 gs = GradingSystem(
