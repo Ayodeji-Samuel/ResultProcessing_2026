@@ -50,7 +50,7 @@ def spreadsheet():
         if level_access and level != level_access:
             flash('Access denied.', 'danger')
             return redirect(url_for('reports.spreadsheet'))
-        if program_access and program != program_access:
+        if program_access and program not in program_access:
             flash('Access denied.', 'danger')
             return redirect(url_for('reports.spreadsheet'))
         
@@ -462,7 +462,7 @@ def student_result(student_id):
     if level_access and student.level != level_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('students.index'))
-    if program_access and student.program != program_access:
+    if program_access and student.program not in program_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('students.index'))
     
@@ -518,7 +518,7 @@ def student_result_pdf(student_id):
     if level_access and student.level != level_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('students.index'))
-    if program_access and student.program != program_access:
+    if program_access and student.program not in program_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('students.index'))
     
@@ -641,7 +641,7 @@ def search_student():
         if level_access:
             query = query.filter_by(level=level_access)
         if program_access:
-            query = query.filter_by(program=program_access)
+            query = query.filter(Student.program.in_(program_access))
         
         if current_session:
             query = query.filter_by(session_id=current_session.id)
@@ -673,7 +673,7 @@ def get_spreadsheet_summary():
     if level_access and int(level) != level_access:
         return jsonify({'error': 'Access denied'}), 403
     
-    if program_access and program != program_access:
+    if program_access and program not in program_access:
         return jsonify({'error': 'Access denied'}), 403
     
     # Get courses for this program, level, and semester

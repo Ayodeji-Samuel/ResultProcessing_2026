@@ -75,8 +75,15 @@
                     <td class="px-6 py-4">
                         {% if user.role == 'level_adviser' %}
                         <div class="text-sm">
-                            <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">{{ user.program }}</span>
-                            <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs ml-1">Level {{ user.level }}</span>
+                            {% set progs = user.get_adviser_programs() %}
+                            {% if progs %}
+                            {% for prog in progs %}
+                            <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">{{ prog }}</span>
+                            {% endfor %}
+                            {% else %}
+                            <span class="px-2 py-1 bg-gray-100 text-gray-400 rounded text-xs italic">No program</span>
+                            {% endif %}
+                            <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs ml-1">Level {{ user.get_adviser_level() }}</span>
                         </div>
                         {% elif user.role == 'lecturer' %}
                         <span class="text-xs text-gray-500">Assigned Courses</span>

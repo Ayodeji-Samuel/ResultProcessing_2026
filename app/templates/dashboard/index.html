@@ -198,7 +198,15 @@
                     </p>
                 </div>
             </div>
-            {% if current_user.program %}
+            {% if current_user.is_level_adviser() and current_user.get_adviser_programs() %}
+            <div class="flex items-start">
+                <i class="ri-bookmark-line text-xl mr-3 mt-0.5"></i>
+                <div>
+                    <p class="font-medium text-sm">Program(s)</p>
+                    <p class="text-primary-100 text-xs mt-1">{{ current_user.get_adviser_programs() | join(', ') }}</p>
+                </div>
+            </div>
+            {% elif current_user.program %}
             <div class="flex items-start">
                 <i class="ri-bookmark-line text-xl mr-3 mt-0.5"></i>
                 <div>

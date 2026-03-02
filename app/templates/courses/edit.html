@@ -153,17 +153,23 @@
                                     id="program" 
                                     class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
                                     required 
-                                    {{ 'disabled' if program_access or course.results.count() > 0 }}>
+                                    {{ 'disabled' if (program_access and program_access|length == 1) or course.results.count() > 0 }}>
                                 {% for code, name in programs %}
+                                {% if not program_access or code in program_access or course.program == code %}
                                 <option value="{{ code }}" {{ 'selected' if course.program == code }}>{{ name }}</option>
+                                {% endif %}
                                 {% endfor %}
                             </select>
                             {% if course.results.count() > 0 %}
                             <input type="hidden" name="program" value="{{ course.program }}">
-                            {% elif program_access %}
-                            <input type="hidden" name="program" value="{{ program_access }}">
+                            {% elif program_access and program_access|length == 1 %}
+                            <input type="hidden" name="program" value="{{ program_access[0] }}">
                             <p class="mt-1 text-sm text-gray-500">
                                 <i class="ri-lock-line"></i> Locked to your assigned program
+                            </p>
+                            {% elif program_access %}
+                            <p class="mt-1 text-sm text-gray-500">
+                                <i class="ri-filter-line"></i> Filtered to your assigned programs
                             </p>
                             {% endif %}
                         </div>

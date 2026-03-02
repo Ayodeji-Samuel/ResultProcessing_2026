@@ -31,7 +31,7 @@ def index():
     if level_access:
         query = query.filter_by(level=level_access)
     if program_access:
-        query = query.filter_by(program=program_access)
+        query = query.filter(Student.program.in_(program_access))
     
     # Apply user filters
     if level_filter and not level_access:
@@ -87,7 +87,7 @@ def upload():
         if level_access and default_level and default_level != level_access:
             flash('You can only upload students for your assigned level.', 'danger')
             return redirect(url_for('students.upload'))
-        if program_access and default_program and default_program != program_access:
+        if program_access and default_program and default_program not in program_access:
             flash('You can only upload students for your assigned program.', 'danger')
             return redirect(url_for('students.upload'))
 
@@ -127,10 +127,10 @@ def upload():
                     )
                     skipped += 1
                     continue
-                if program_access and row_program and row_program != program_access:
+                if program_access and row_program and row_program not in program_access:
                     errors.append(
                         f"{record['matric_number']}: Program '{row_program}' not allowed "
-                        f"(you are assigned to '{program_access}') — skipped"
+                        f"(you are assigned to '{', '.join(program_access)}') — skipped"
                     )
                     skipped += 1
                     continue
@@ -252,7 +252,7 @@ def create():
         if level_access and level != level_access:
             flash('You can only add students for your assigned level.', 'danger')
             return redirect(url_for('students.create'))
-        if program_access and program != program_access:
+        if program_access and program not in program_access:
             flash('You can only add students for your assigned program.', 'danger')
             return redirect(url_for('students.create'))
         
@@ -309,7 +309,7 @@ def view(student_id):
     if level_access and student.level != level_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('students.index'))
-    if program_access and student.program != program_access:
+    if program_access and student.program not in program_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('students.index'))
     
@@ -429,7 +429,7 @@ def edit(student_id):
     if level_access and student.level != level_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('students.index'))
-    if program_access and student.program != program_access:
+    if program_access and student.program not in program_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('students.index'))
     
@@ -448,7 +448,7 @@ def edit(student_id):
         if level_access and new_level != level_access:
             flash('You cannot change student to a different level.', 'danger')
             return redirect(url_for('students.edit', student_id=student_id))
-        if program_access and new_program != program_access:
+        if program_access and new_program not in program_access:
             flash('You cannot change student to a different program.', 'danger')
             return redirect(url_for('students.edit', student_id=student_id))
         

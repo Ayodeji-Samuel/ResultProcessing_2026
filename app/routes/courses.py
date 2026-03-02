@@ -25,7 +25,7 @@ def index():
     if level_access:
         query = query.filter_by(level=level_access)
     if program_access:
-        query = query.filter_by(program=program_access)
+        query = query.filter(Course.program.in_(program_access))
     
     # Apply user filters
     if level_filter and not level_access:
@@ -71,7 +71,7 @@ def create():
         if level_access and level != level_access:
             flash('You can only add courses for your assigned level.', 'danger')
             return redirect(url_for('courses.create'))
-        if program_access and program != program_access:
+        if program_access and program not in program_access:
             flash('You can only add courses for your assigned program.', 'danger')
             return redirect(url_for('courses.create'))
         
@@ -131,7 +131,7 @@ def edit(course_id):
     if level_access and course.level != level_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('courses.index'))
-    if program_access and course.program != program_access:
+    if program_access and course.program not in program_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('courses.index'))
     
@@ -151,7 +151,7 @@ def edit(course_id):
             if level_access and new_level != level_access:
                 flash('You cannot change course to a different level.', 'danger')
                 return redirect(url_for('courses.edit', course_id=course_id))
-            if program_access and new_program != program_access:
+            if program_access and new_program not in program_access:
                 flash('You cannot change course to a different program.', 'danger')
                 return redirect(url_for('courses.edit', course_id=course_id))
             
@@ -185,7 +185,7 @@ def delete(course_id):
     if level_access and course.level != level_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('courses.index'))
-    if program_access and course.program != program_access:
+    if program_access and course.program not in program_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('courses.index'))
     
@@ -216,7 +216,7 @@ def batch_create():
         if level_access and level != level_access:
             flash('You can only add courses for your assigned level.', 'danger')
             return redirect(url_for('courses.batch_create'))
-        if program_access and program != program_access:
+        if program_access and program not in program_access:
             flash('You can only add courses for your assigned program.', 'danger')
             return redirect(url_for('courses.batch_create'))
         

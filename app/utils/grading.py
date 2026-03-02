@@ -6,15 +6,21 @@ from flask_login import current_user
 def get_accessible_filters():
     """
     Get filters based on user access level.
-    
+
     Returns:
         tuple: (level_access, program_access)
-            - None, None for HoD (no restrictions)
-            - level, program for other roles
+            - None, None for HoD / Admin (no restrictions)
+            - level, [programs] for Level Adviser (one or more programs)
+            - None, None for Lecturer (access via course assignments)
     """
     if current_user.role == 'hod':
         return None, None
-    return current_user.level, current_user.program
+    if current_user.role == 'level_adviser':
+        programs = current_user.get_adviser_programs()  # always a list
+        level = current_user.get_adviser_level()
+        return level, (programs if programs else None)
+    # Lecturer (or any other role) – no blanket level/program restriction
+    return None, None
 
 
 def get_grade_info(score, degree_type='BSc'):

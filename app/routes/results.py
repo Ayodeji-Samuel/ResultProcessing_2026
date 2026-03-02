@@ -42,7 +42,7 @@ def index():
     if level_access:
         query = query.filter(Course.level == level_access)
     if program_access:
-        query = query.filter(Course.program == program_access)
+        query = query.filter(Course.program.in_(program_access))
     
     # Apply user filters
     if matric_filter:
@@ -93,7 +93,7 @@ def upload():
     if level_access:
         course_query = course_query.filter_by(level=level_access)
     if program_access:
-        course_query = course_query.filter_by(program=program_access)
+        course_query = course_query.filter(Course.program.in_(program_access))
     
     courses = course_query.order_by(Course.level, Course.semester, Course.course_code).all()
     
@@ -111,7 +111,7 @@ def upload():
         if level_access and course.level != level_access:
             flash('Access denied.', 'danger')
             return redirect(url_for('results.upload'))
-        if program_access and course.program != program_access:
+        if program_access and course.program not in program_access:
             flash('Access denied.', 'danger')
             return redirect(url_for('results.upload'))
         
@@ -331,7 +331,7 @@ def view_course(course_id):
     if level_access and course.level != level_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
-    if program_access and course.program != program_access:
+    if program_access and course.program not in program_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
     
@@ -381,7 +381,7 @@ def manual_entry(course_id):
     if level_access and course.level != level_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
-    if program_access and course.program != program_access:
+    if program_access and course.program not in program_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
     
@@ -624,7 +624,7 @@ def delete_result(result_id):
     if level_access and course.level != level_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
-    if program_access and course.program != program_access:
+    if program_access and course.program not in program_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
     
@@ -653,7 +653,7 @@ def edit_result(result_id):
     if level_access and course.level != level_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
-    if program_access and course.program != program_access:
+    if program_access and course.program not in program_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
     
@@ -739,7 +739,7 @@ def clear_course_results(course_id):
     if level_access and course.level != level_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
-    if program_access and course.program != program_access:
+    if program_access and course.program not in program_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
     
@@ -783,7 +783,7 @@ def approve_course_results(course_id):
         # HoD and Level Adviser can approve any course in their scope
         level_access, program_access = get_accessible_filters()
         if not level_access or course.level == level_access:
-            if not program_access or course.program == program_access:
+            if not program_access or course.program in program_access:
                 can_approve = True
     else:
         # Regular lecturer must be assigned to the course

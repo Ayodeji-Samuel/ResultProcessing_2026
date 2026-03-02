@@ -422,14 +422,21 @@ def create_user():
         # Generate temporary password
         temp_password = generate_password()
         
-        # For lecturers, don't assign level/program (they get course assignments)
-        # For level advisers, require level and program
+        from app.models import LevelAdviserProgram
+
+        # Determine level/program based on role
         if form.role.data == 'lecturer':
             program = None
             level = None
+            adviser_programs = []
+        elif form.role.data == 'level_adviser':
+            level = int(form.level.data) if form.level.data else None
+            adviser_programs = request.form.getlist('programs[]')
+            program = None  # multi-program advisers store programs in LevelAdviserProgram
         else:
             program = form.program.data if form.program.data else None
             level = int(form.level.data) if form.level.data else None
+            adviser_programs = []
         
         user = User(
             username=email,  # University email is the username
@@ -445,11 +452,20 @@ def create_user():
         user.set_password(temp_password)
         
         db.session.add(user)
+        db.session.flush()  # get user.id before creating related records
+
+        # Create LevelAdviserProgram entries for level advisers
+        for prog in adviser_programs:
+            if prog:
+                lap = LevelAdviserProgram(user_id=user.id, program=prog, level=level)
+                db.session.add(lap)
+
         db.session.commit()
         
+        adviser_programs_str = ', '.join(adviser_programs) if adviser_programs else user.program
         log_audit(current_user.id, 'CREATE', 'USER', 'User', user.id, 
                  details=f'Created user account: {user.username}',
-                 new_values={'username': user.username, 'role': user.role, 'program': user.program})
+                 new_values={'username': user.username, 'role': user.role, 'program': adviser_programs_str})
         
         flash(f'User account created successfully!', 'success')
         flash(f'Username (Email): {email}', 'info')
@@ -458,7 +474,8 @@ def create_user():
         
         return redirect(url_for('auth.users'))
     
-    return render_template('auth/create_user.html', form=form)
+    return render_template('auth/create_user.html', form=form,
+                           all_programs=Config.PROGRAMS)
 
 
 @auth_bp.route('/users/<int:user_id>/edit', methods=['GET', 'POST'])
@@ -511,26 +528,39 @@ def edit_user(user_id):
             flash('You do not have permission to assign administrator role.', 'danger')
             return redirect(url_for('auth.users'))
         
+        from app.models import LevelAdviserProgram
+
         user.email = form.email.data.lower().strip()
         user.full_name = form.full_name.data
         user.role = form.role.data
         
-        # For lecturers, clear level and program (they get course assignments instead)
-        # For level advisers and HoD, use the form values
         if form.role.data == 'lecturer':
             user.program = None
             user.level = None
+            LevelAdviserProgram.query.filter_by(user_id=user.id).delete()
+        elif form.role.data == 'level_adviser':
+            level = int(form.level.data) if form.level.data else None
+            user.level = level
+            user.program = None
+            # Replace all programme assignments
+            LevelAdviserProgram.query.filter_by(user_id=user.id).delete()
+            for prog in request.form.getlist('programs[]'):
+                if prog:
+                    lap = LevelAdviserProgram(user_id=user.id, program=prog, level=level)
+                    db.session.add(lap)
         else:
             user.program = form.program.data if form.program.data else None
             user.level = int(form.level.data) if form.level.data else None
+            LevelAdviserProgram.query.filter_by(user_id=user.id).delete()
         
         user.is_active = form.is_active.data
         
+        adviser_progs = user.get_adviser_programs() if user.role == 'level_adviser' else None
         new_values = {
             'email': user.email,
             'full_name': user.full_name,
             'role': user.role,
-            'program': user.program,
+            'program': ', '.join(adviser_progs) if adviser_progs else user.program,
             'level': user.level,
             'is_active': user.is_active
         }
@@ -547,8 +577,13 @@ def edit_user(user_id):
     # Pre-populate form
     form.level.data = str(user.level) if user.level else ''
     form.program.data = user.program if user.program else ''
+    # For level advisers, gather existing programme assignments for template checkboxes
+    from app.models import LevelAdviserProgram
+    adviser_programs = user.get_adviser_programs() if user.role == 'level_adviser' else []
     
-    return render_template('auth/edit_user.html', form=form, user=user)
+    return render_template('auth/edit_user.html', form=form, user=user,
+                           adviser_programs=adviser_programs,
+                           all_programs=Config.PROGRAMS)
 
 
 @auth_bp.route('/users/<int:user_id>/toggle', methods=['POST'])

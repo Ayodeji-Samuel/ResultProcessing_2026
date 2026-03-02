@@ -194,7 +194,11 @@
                     </button>
                     
                     <div class="flex items-center space-x-4">
-                        {% if current_user.program %}
+                        {% if current_user.is_level_adviser() %}
+                        {% for prog in current_user.get_adviser_programs() %}
+                        <span class="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium">{{ prog }}</span>
+                        {% endfor %}
+                        {% elif current_user.program %}
                         <span class="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium">{{ current_user.program }}</span>
                         {% endif %}
                         {% if current_user.level %}

@@ -70,9 +70,49 @@ class User(UserMixin, db.Model):
     def can_access_result_alterations(self):
         """Check if user can view result alteration logs (Admin only)"""
         return self.role == 'admin'
-    
+
+    def get_adviser_programs(self):
+        """Return list of programs this level adviser is assigned to.
+        Falls back to the legacy single-program field if no multi-program
+        assignments exist yet."""
+        assignments = LevelAdviserProgram.query.filter_by(user_id=self.id).all()
+        if assignments:
+            return [a.program for a in assignments]
+        # Backward-compat fallback
+        return [self.program] if self.program else []
+
+    def get_adviser_level(self):
+        """Return the level this level adviser is assigned to."""
+        assignment = LevelAdviserProgram.query.filter_by(user_id=self.id).first()
+        if assignment:
+            return assignment.level
+        return self.level  # backward-compat fallback
+
     def __repr__(self):
         return f'<User {self.username}>'
+
+
+class LevelAdviserProgram(db.Model):
+    """Stores the (level, program) pairs a level adviser oversees.
+    Replaces the single User.program / User.level fields for the
+    level_adviser role, allowing a single lecturer to advise multiple
+    programs at the same (or different) level(s)."""
+    __tablename__ = 'level_adviser_programs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    program = db.Column(db.String(64), nullable=False)
+    level = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='adviser_programs')
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'program', name='uq_adviser_user_program'),
+    )
+
+    def __repr__(self):
+        return f'<LevelAdviserProgram user={self.user_id} {self.level}/{self.program}>'
 
 
 class AcademicSession(db.Model):

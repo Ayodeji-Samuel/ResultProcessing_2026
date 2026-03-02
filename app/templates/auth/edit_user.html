@@ -82,21 +82,37 @@
                         </div>
                         
                         <div id="level-adviser-fields">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label for="program" class="block text-sm font-medium text-gray-700 mb-2">
-                                        Assigned Program <span id="program-required" class="text-red-500">*</span>
+                            <!-- Level (single) -->
+                            <div class="mb-4">
+                                <label for="level" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Assigned Level <span id="level-required" class="text-red-500">*</span>
+                                </label>
+                                {{ form.level(class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent", id="level") }}
+                                <p class="mt-1 text-sm text-gray-500">Required for Level Advisers only</p>
+                            </div>
+                            <!-- Program(s) - checkboxes for Level Adviser, dropdown for HoD -->
+                            <div id="program-checkboxes">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Assigned Program(s) <span class="text-red-500">*</span>
+                                </label>
+                                <div class="grid grid-cols-1 gap-2 p-3 border border-gray-300 rounded-lg bg-gray-50">
+                                    {% for prog in all_programs %}
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="programs[]" value="{{ prog }}"
+                                               {% if prog in adviser_programs %}checked{% endif %}
+                                               class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-2">
+                                        <span class="text-sm text-gray-700">{{ prog }}</span>
                                     </label>
-                                    {{ form.program(class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent", id="program") }}
-                                    <p class="mt-1 text-sm text-gray-500">Required for Level Advisers only</p>
+                                    {% endfor %}
                                 </div>
-                                <div>
-                                    <label for="level" class="block text-sm font-medium text-gray-700 mb-2">
-                                        Assigned Level <span id="level-required" class="text-red-500">*</span>
-                                    </label>
-                                    {{ form.level(class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent", id="level") }}
-                                    <p class="mt-1 text-sm text-gray-500">Required for Level Advisers only</p>
-                                </div>
+                                <p class="mt-1 text-sm text-gray-500">Select one or more programs (Level Adviser only)</p>
+                            </div>
+                            <!-- Single program dropdown for HoD / other roles -->
+                            <div id="program-single" class="hidden">
+                                <label for="program" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Assigned Program
+                                </label>
+                                {{ form.program(class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent", id="program") }}
                             </div>
                         </div>
                     </div>
@@ -179,30 +195,26 @@
 <script>
 document.getElementById('role').addEventListener('change', function() {
     const levelAdviserFields = document.getElementById('level-adviser-fields');
-    const programField = document.getElementById('program');
+    const programCheckboxes = document.getElementById('program-checkboxes');
+    const programSingle = document.getElementById('program-single');
     const levelField = document.getElementById('level');
-    const programRequired = document.getElementById('program-required');
     const levelRequired = document.getElementById('level-required');
     
-    if (this.value === 'hod' || this.value === 'lecturer') {
-        // Hide and disable fields for HoD and Lecturer
-        levelAdviserFields.style.display = 'none';
-        programField.disabled = true;
-        levelField.disabled = true;
-        programField.value = '';
-        levelField.value = '';
-        if (programRequired) programRequired.style.display = 'none';
-        if (levelRequired) levelRequired.style.display = 'none';
-    } else {
-        // Show and enable fields for Level Adviser
+    if (this.value === 'level_adviser') {
+        // Show level + multi-program checkboxes for Level Adviser
         levelAdviserFields.style.display = 'block';
-        programField.disabled = false;
+        programCheckboxes.style.display = 'block';
+        if (programSingle) programSingle.style.display = 'none';
         levelField.disabled = false;
-        if (programRequired) programRequired.style.display = 'inline';
         if (levelRequired) levelRequired.style.display = 'inline';
+    } else {
+        // Hide all assignment fields for Lecturer, HoD, Admin
+        levelAdviserFields.style.display = 'none';
+        levelField.disabled = true;
+        levelField.value = '';
+        document.querySelectorAll('input[name="programs[]"]').forEach(cb => cb.checked = false);
     }
 });
-
 // Trigger on page load
 document.getElementById('role').dispatchEvent(new Event('change'));
 </script>
