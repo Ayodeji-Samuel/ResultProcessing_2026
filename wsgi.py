@@ -22,5 +22,5 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_prefix=1)
 
 application = DispatcherMiddleware(
     Response('Not Found', status=404),
-    {'/cschub': app.wsgi_app}
+    {'/cschub': app}
 )
