@@ -71,7 +71,8 @@ pipeline {
                     ls -dt */ | tail -n +6 | xargs -r rm -rf
                 """
             }
-        }
+        }        
+        
     }
 
     post {
