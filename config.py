@@ -27,7 +27,7 @@ class Config:
     #
     # Note: the package mysqlclient must be installed for the mysqldb driver.
     SQLALCHEMY_DATABASE_URI = normalize_database_url(os.environ.get('DATABASE_URL')) or \
-        'sqlite:///' + os.path.join(basedir, 'instance', 'results.db')
+        'sqlite:///' + os.path.join(os.path.dirname(basedir), 'cschub_storage', 'instance', 'results.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True
