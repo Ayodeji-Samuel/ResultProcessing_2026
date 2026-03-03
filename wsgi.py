@@ -21,6 +21,6 @@ app.config['PREFERRED_URL_SCHEME'] = 'https'
 app.wsgi_app = ProxyFix(app.wsgi_app, x_prefix=1)
 
 application = DispatcherMiddleware(
-    Response('Not Found', status=404),
+    app,
     {'/cschub': app}
 )
