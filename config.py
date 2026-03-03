@@ -34,7 +34,7 @@ class Config:
     }
     
     # Upload configurations
-    UPLOAD_FOLDER = os.path.join(basedir, 'uploads')
+    UPLOAD_FOLDER = os.path.join(os.path.dirname(basedir), 'cschub_storage', 'uploads')
     LOGO_FOLDER = os.path.join(basedir, 'app', 'static', 'logos')
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
     ALLOWED_EXTENSIONS = {'csv'}
