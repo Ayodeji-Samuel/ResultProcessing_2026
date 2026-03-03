@@ -41,7 +41,7 @@ pipeline {
             steps {
                 sh """
                     cd ${NEW_RELEASE}
-                    source /var/www/cschub/venv/bin/activate
+                    . /var/www/cschub/venv/bin/activate
                     pip install --upgrade pip
                     pip install -r requirements.txt
                 """
