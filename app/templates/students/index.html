@@ -144,7 +144,7 @@
     {% if students.pages > 1 %}
     <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
         <div class="text-sm text-gray-600">
-            Showing {{ ((students.page - 1) * students.per_page) + 1 }} to {{ min(students.page * students.per_page, students.total) }} of {{ students.total }} students
+            Showing {{ ((students.page - 1) * students.per_page) + 1 }} to {{ [students.page * students.per_page, students.total] | min }} of {{ students.total }} students
         </div>
         <div class="flex space-x-2">
             {% if students.has_prev %}

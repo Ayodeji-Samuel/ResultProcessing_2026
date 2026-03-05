@@ -290,7 +290,7 @@
     {% if alterations.pages > 1 %}
     <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
         <div class="text-sm text-gray-600">
-            Showing {{ ((alterations.page - 1) * 50) + 1 }} to {{ min(alterations.page * 50, alterations.total) }} of {{ alterations.total }} entries
+            Showing {{ ((alterations.page - 1) * 50) + 1 }} to {{ [alterations.page * 50, alterations.total] | min }} of {{ alterations.total }} entries
         </div>
         <div class="flex gap-2">
             {% if alterations.has_prev %}
