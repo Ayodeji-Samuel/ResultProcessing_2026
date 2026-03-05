@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 from config import config
+import mimetypes
 import os
 
 db = SQLAlchemy()
@@ -12,6 +13,15 @@ csrf = CSRFProtect()
 login_manager.login_view = 'auth.login'
 login_manager.login_message = 'Please log in to access this page.'
 login_manager.login_message_category = 'info'
+
+# ── Register font MIME types that may be absent on minimal Linux installations
+# (DigitalOcean, Render, Railway …) so that remixicon and other web-font files
+# are served with the correct Content-Type header.  Browsers strictly validate
+# font MIME types and silently discard resources served as octet-stream.
+mimetypes.add_type('font/woff2', '.woff2')
+mimetypes.add_type('font/woff',  '.woff')
+mimetypes.add_type('font/ttf',   '.ttf')
+mimetypes.add_type('font/otf',   '.otf')
 
 
 def create_app(config_name='default'):
