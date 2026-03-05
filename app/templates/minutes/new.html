@@ -24,7 +24,12 @@
 
 {% block content %}
 <div class="max-w-4xl mx-auto space-y-6"
-     x-data="minutesRecorder({{ (record.raw_transcript or '')|tojson if record else '""' }})" x-init="init()">
+     x-data="minutesRecorder(
+       {{ (record.raw_transcript or '')|tojson if record else '&quot;&quot;' }},
+       {{ 'true' if (record and token) else 'false' }},
+       {% if record and token %}'{{ host_url }}{{ url_for('minutes.attend', token=token.token) }}'{% else %}null{% endif %},
+       {{ record.id if record else 'null' }}
+     )" x-init="init()">
 
   <!-- Header -->
   <div class="flex items-center gap-4">
@@ -114,41 +119,76 @@
       <!-- ──────── Right column: Recording & Transcript ──────── -->
       <div class="lg:col-span-2 space-y-5">
 
-        <!-- ── Attendance Link (shown immediately after meeting is saved) ── -->
-        {% if record and token %}
-        <div class="bg-teal-50 border border-teal-300 rounded-xl p-5">
+        <!-- ── Step 1: Quick-Start – share attendance link BEFORE recording ── -->
+
+        {# Amber prompt: shown when meeting hasn't been started yet (no record yet) #}
+        <div x-show="!quickStarted" x-cloak
+             class="bg-amber-50 border border-amber-300 rounded-xl p-5">
+          <div class="flex items-start gap-3 mb-3">
+            <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-amber-100 rounded-full">
+              <i class="ri-broadcast-line text-amber-600 text-lg"></i>
+            </div>
+            <div>
+              <h3 class="font-semibold text-amber-900 text-sm">Step 1 &mdash; Start Meeting &amp; Share Attendance Link</h3>
+              <p class="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                Click <strong>Start Meeting</strong> to instantly generate a shareable link.
+                Members sign in and can record a short voice introduction so the AI can
+                identify <em>who is speaking</em> when generating your minutes later.
+              </p>
+            </div>
+          </div>
+          <div x-show="quickStartError" class="mb-2 text-xs text-red-600 font-medium flex items-center gap-1">
+            <i class="ri-error-warning-line"></i>
+            <span x-text="quickStartError"></span>
+          </div>
+          <button type="button" @click="quickStart()"
+                  :disabled="isStarting"
+                  class="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors shadow">
+            <i :class="isStarting ? 'ri-loader-4-line animate-spin' : 'ri-broadcast-line'"></i>
+            <span x-text="isStarting ? 'Starting Meeting...' : 'Start Meeting & Get Attendance Link'"></span>
+          </button>
+          <p class="text-xs text-amber-600 mt-2">
+            <i class="ri-information-line"></i>
+            Fill in the meeting title above first. Other details can be updated while the meeting is in progress.
+          </p>
+        </div>
+
+        {# Teal card: shown after quick-start (AJAX) OR after server-side save (record+token exists) #}
+        <div x-show="quickStarted && attendUrl" x-cloak
+             class="bg-teal-50 border border-teal-300 rounded-xl p-5">
           <div class="flex items-start gap-3 mb-3">
             <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-teal-100 rounded-full">
               <i class="ri-links-line text-teal-600 text-lg"></i>
             </div>
             <div>
-              <h3 class="font-semibold text-teal-900 text-sm">Attendance Link Ready</h3>
-              <p class="text-xs text-teal-700 mt-0.5">Share this link with members so they can sign in while the meeting is in progress.</p>
+              <h3 class="font-semibold text-teal-900 text-sm">&#10003; Attendance Link Ready &mdash; Share Now!</h3>
+              <p class="text-xs text-teal-700 mt-0.5 leading-relaxed">
+                Send this link to all members <strong>right now</strong> so they can sign in and record
+                a voice introduction. The AI will use their voices to attribute who said what in the transcript.
+              </p>
             </div>
           </div>
           <div class="flex items-center gap-2">
             <input id="att-link-input" type="text" readonly
-                   value="{{ host_url }}{{ url_for('minutes.attend', token=token.token) }}"
+                   :value="attendUrl"
                    class="flex-1 px-3 py-2 bg-white border border-teal-300 rounded-lg text-sm text-gray-700 cursor-pointer focus:outline-none"
-                   onclick="this.select();document.execCommand('copy');
-                            const b=document.getElementById('att-copied');
-                            b.classList.remove('hidden');setTimeout(()=>b.classList.add('hidden'),2500)">
-            <button type="button"
-                    onclick="const v=document.getElementById('att-link-input').value;
-                             navigator.clipboard.writeText(v);
-                             const b=document.getElementById('att-copied');
-                             b.classList.remove('hidden');setTimeout(()=>b.classList.add('hidden'),2500)"
+                   @click="$el.select(); copyAttendLink()">
+            <button type="button" @click="copyAttendLink()"
                     class="flex-shrink-0 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5">
-              <i class="ri-clipboard-line"></i> Copy
+              <i class="ri-clipboard-line"></i>
+              <span x-text="linkCopied ? 'Copied!' : 'Copy'"></span>
             </button>
-            <a href="{{ url_for('minutes.view', meeting_id=record.id) }}"
+            <a :href="meetingId ? '/minutes/' + meetingId : '#'"
                class="flex-shrink-0 px-3 py-2 bg-white border border-teal-300 hover:bg-teal-50 text-teal-700 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5">
-              <i class="ri-eye-line"></i> View Meeting
+              <i class="ri-eye-line"></i> View
             </a>
           </div>
-          <span id="att-copied" class="hidden text-xs text-teal-700 font-medium mt-1.5 block">&#10003; Link copied to clipboard!</span>
+          <div x-show="linkCopied" class="mt-1.5 text-xs text-teal-700 font-medium">&#10003; Link copied to clipboard!</div>
+          <p class="text-xs text-teal-600 mt-2 flex items-start gap-1">
+            <i class="ri-time-line flex-shrink-0 mt-px"></i>
+            The link stays active until you finalize the meeting. You can continue recording and filling in details below.
+          </p>
         </div>
-        {% endif %}
 
         <!-- Voice Recorder Card -->
         <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
@@ -239,8 +279,9 @@
 
 {% block scripts %}
 <script>
-function minutesRecorder(initialTranscript) {
+function minutesRecorder(initialTranscript, isAlreadyStarted, initialAttendUrl, initialMeetingId) {
   return {
+    // ── recording state ──────────────────────────────────────────
     isRecording:    false,
     speechSupported: false,
     transcript:     initialTranscript || '',
@@ -250,6 +291,89 @@ function minutesRecorder(initialTranscript) {
     _recognition:   null,
     _timerInterval: null,
     _seconds:       0,
+
+    // ── quick-start / attendance link state ──────────────────────
+    quickStarted:   isAlreadyStarted  || false,
+    attendUrl:      initialAttendUrl  || null,
+    meetingId:      initialMeetingId  || null,
+    isStarting:     false,
+    quickStartError: '',
+    linkCopied:     false,
+
+    // ── quick-start: create meeting + token via AJAX ──────────────
+    async quickStart() {
+      const titleEl = document.querySelector('[name=title]');
+      const dateEl  = document.querySelector('[name=meeting_date]');
+      const timeEl  = document.querySelector('[name=meeting_time]');
+      const venueEl = document.querySelector('[name=venue]');
+      const chairEl = document.querySelector('[name=chairperson]');
+      const title   = titleEl ? titleEl.value.trim() : '';
+      if (!title) {
+        this.quickStartError = 'Please enter a meeting title first (see the Title field on the left).';
+        if (titleEl) titleEl.focus();
+        return;
+      }
+      this.isStarting     = true;
+      this.quickStartError = '';
+      try {
+        const resp = await fetch('{{ url_for("minutes.api_quick_start") }}', {
+          method:  'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken':  document.querySelector('meta[name="csrf-token"]').content
+          },
+          body: JSON.stringify({
+            title:        title,
+            meeting_date: dateEl  ? dateEl.value  : '',
+            meeting_time: timeEl  ? timeEl.value  : '',
+            venue:        venueEl ? venueEl.value : '',
+            chairperson:  chairEl ? chairEl.value : '',
+          })
+        });
+        const data = await resp.json();
+        if (data.ok) {
+          this.quickStarted = true;
+          this.attendUrl    = data.attend_url;
+          this.meetingId    = data.meeting_id;
+          // Update the form to POST to the edit endpoint for this record
+          const form = document.getElementById('minutesForm');
+          form.action = data.edit_url;
+          // Ensure _source hidden field is present so the edit route
+          // returns us back to this recording page after saving.
+          let srcInput = form.querySelector('[name=_source]');
+          if (!srcInput) {
+            srcInput       = document.createElement('input');
+            srcInput.type  = 'hidden';
+            srcInput.name  = '_source';
+            form.appendChild(srcInput);
+          }
+          srcInput.value = 'new';
+          // Scroll the new teal card into view
+          this.$nextTick(() => {
+            const card = document.querySelector('[x-show="quickStarted && attendUrl"]');
+            if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          });
+        } else {
+          this.quickStartError = data.error || 'Failed to start the meeting.';
+        }
+      } catch (err) {
+        this.quickStartError = 'Network error: ' + err.message;
+      } finally {
+        this.isStarting = false;
+      }
+    },
+
+    // ── copy attendance link to clipboard ────────────────────────
+    copyAttendLink() {
+      if (!this.attendUrl) return;
+      navigator.clipboard.writeText(this.attendUrl).catch(() => {
+        // Fallback for older browsers
+        const el = document.getElementById('att-link-input');
+        if (el) { el.select(); document.execCommand('copy'); }
+      });
+      this.linkCopied = true;
+      setTimeout(() => { this.linkCopied = false; }, 2500);
+    },
 
     init() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;

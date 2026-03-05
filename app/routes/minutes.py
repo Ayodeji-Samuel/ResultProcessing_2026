@@ -191,6 +191,57 @@ def new():
     return render_template('minutes/new.html', today=date.today().isoformat())
 
 
+# ─────────────────────────── quick-start (AJAX) ─────────────────────────────
+
+@minutes_bp.route('/api/quick-start', methods=['POST'])
+@login_required
+def api_quick_start():
+    """AJAX: Create a minimal meeting record + attendance token in one step.
+
+    Called from the new-meeting page so the host can share the attendance link
+    the moment the meeting begins — before they have finished filling in all
+    details and before any recording starts.  Members who sign in via the link
+    can record a short voice introduction so the AI can attribute contributions
+    to speakers when generating minutes later.
+    """
+    body = request.get_json(force=True, silent=True) or {}
+    title = (body.get('title') or '').strip() or 'Untitled Meeting'
+    meeting_date_str = (body.get('meeting_date') or '').strip()
+    try:
+        meeting_date = date.fromisoformat(meeting_date_str) if meeting_date_str else date.today()
+    except ValueError:
+        meeting_date = date.today()
+
+    record = MeetingMinutes(
+        title         = title,
+        meeting_date  = meeting_date,
+        meeting_time  = (body.get('meeting_time') or '').strip(),
+        venue         = (body.get('venue')        or '').strip(),
+        chairperson   = (body.get('chairperson')  or '').strip(),
+        status        = 'draft',
+        created_by_id = current_user.id,
+    )
+    db.session.add(record)
+    db.session.commit()
+
+    tok = AttendanceToken(
+        meeting_id    = record.id,
+        token         = secrets.token_urlsafe(32),
+        created_by_id = current_user.id,
+        expires_at    = None,
+        is_active     = True,
+    )
+    db.session.add(tok)
+    db.session.commit()
+
+    return jsonify({
+        'ok':        True,
+        'meeting_id': record.id,
+        'attend_url': request.host_url.rstrip('/') + url_for('minutes.attend', token=tok.token),
+        'edit_url':   url_for('minutes.edit', meeting_id=record.id),
+    })
+
+
 # ─────────────────────────── view ───────────────────────────────────────────
 
 @minutes_bp.route('/<int:meeting_id>')
