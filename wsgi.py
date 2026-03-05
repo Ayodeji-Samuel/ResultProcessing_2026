@@ -8,19 +8,17 @@
 # application = app
 from app import create_app
 from werkzeug.middleware.proxy_fix import ProxyFix
-from werkzeug.middleware.dispatcher import DispatcherMiddleware
-from werkzeug.wrappers import Response
 import os
 
-config_name = os.environ.get('FLASK_CONFIG', 'default')
+config_name = os.environ.get('FLASK_CONFIG', 'production')
 app = create_app(config_name)
 
-app.config['APPLICATION_ROOT'] = '/cschub'
-app.config['PREFERRED_URL_SCHEME'] = 'https'
+# ProxyFix handles X-Forwarded-* headers from Nginx.
+# x_prefix=1 reads X-Forwarded-Prefix and sets SCRIPT_NAME so that
+# url_for() generates the correct sub-path URLs (e.g. /cschub/students/).
+# Do NOT set APPLICATION_ROOT here — DispatcherMiddleware or the proxy
+# sets SCRIPT_NAME directly; setting APPLICATION_ROOT as well doubles
+# the prefix and breaks all redirects/links on the cloud server.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
-app.wsgi_app = ProxyFix(app.wsgi_app, x_prefix=1)
-
-application = DispatcherMiddleware(
-    app,
-    {'/cschub': app}
-)
+application = app
