@@ -148,14 +148,14 @@
         </div>
         <div class="flex space-x-2">
             {% if students.has_prev %}
-            <a href="{{ url_for('students.index', page=students.prev_num, **request.args) }}" 
+            <a href="{{ url_for('students.index', page=students.prev_num, level=request.args.get('level'), program=request.args.get('program'), search=request.args.get('search')) }}" 
                class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors text-sm font-medium">
                 <i class="ri-arrow-left-line mr-1"></i>Previous
             </a>
             {% endif %}
             {% for page_num in students.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
                 {% if page_num %}
-                <a href="{{ url_for('students.index', page=page_num, **request.args) }}" 
+                <a href="{{ url_for('students.index', page=page_num, level=request.args.get('level'), program=request.args.get('program'), search=request.args.get('search')) }}" 
                    class="px-4 py-2 {{ 'bg-primary-600 text-white' if page_num == students.page else 'border border-gray-300 hover:bg-gray-100' }} rounded-lg transition-colors text-sm font-medium">
                     {{ page_num }}
                 </a>
@@ -164,7 +164,7 @@
                 {% endif %}
             {% endfor %}
             {% if students.has_next %}
-            <a href="{{ url_for('students.index', page=students.next_num, **request.args) }}" 
+            <a href="{{ url_for('students.index', page=students.next_num, level=request.args.get('level'), program=request.args.get('program'), search=request.args.get('search')) }}" 
                class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors text-sm font-medium">
                 Next<i class="ri-arrow-right-line ml-1"></i>
             </a>

@@ -724,6 +724,8 @@ def change_password():
             return render_template('auth/change_password.html', form=form)
         
         current_user.set_password(form.new_password.data)
+        # Also clear any pending forced-change flag so the user is not prompted again
+        current_user.must_change_password = False
         db.session.commit()
         
         log_audit(current_user.id, 'CHANGE_PASSWORD', 'AUTH', 'User', current_user.id, 
@@ -807,9 +809,15 @@ def audit_logs():
     if status_filter:
         query = query.filter(AuditLog.status == status_filter)
     if date_from:
-        query = query.filter(AuditLog.created_at >= datetime.strptime(date_from, '%Y-%m-%d'))
+        try:
+            query = query.filter(AuditLog.created_at >= datetime.strptime(date_from, '%Y-%m-%d'))
+        except ValueError:
+            date_from = ''
     if date_to:
-        query = query.filter(AuditLog.created_at <= datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1))
+        try:
+            query = query.filter(AuditLog.created_at <= datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1))
+        except ValueError:
+            date_to = ''
     
     logs = query.order_by(AuditLog.created_at.desc()).paginate(
         page=page, per_page=50, error_out=False
@@ -864,9 +872,15 @@ def result_alterations():
     if alteration_type:
         query = query.filter(ResultAlteration.alteration_type == alteration_type)
     if date_from:
-        query = query.filter(ResultAlteration.created_at >= datetime.strptime(date_from, '%Y-%m-%d'))
+        try:
+            query = query.filter(ResultAlteration.created_at >= datetime.strptime(date_from, '%Y-%m-%d'))
+        except ValueError:
+            date_from = ''
     if date_to:
-        query = query.filter(ResultAlteration.created_at <= datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1))
+        try:
+            query = query.filter(ResultAlteration.created_at <= datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1))
+        except ValueError:
+            date_to = ''
     
     alterations = query.order_by(ResultAlteration.created_at.desc()).paginate(
         page=page, per_page=50, error_out=False
