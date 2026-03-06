@@ -23,13 +23,16 @@
 {% endblock %}
 
 {% block content %}
+<script>
+  window.__minutesData = {
+    initialTranscript:  {{ (record.raw_transcript or '') | tojson if record else '""' | safe }},
+    isAlreadyStarted:   {{ 'true' if (record and token) else 'false' }},
+    initialAttendUrl:   {% if record and token %}{{ (host_url ~ url_for('minutes.attend', token=token.token)) | tojson }}{% else %}null{% endif %},
+    initialMeetingId:   {{ record.id if record else 'null' }}
+  };
+</script>
 <div class="max-w-4xl mx-auto space-y-6"
-     x-data="minutesRecorder(
-       {{ (record.raw_transcript or '')|tojson if record else '&quot;&quot;' }},
-       {{ 'true' if (record and token) else 'false' }},
-       {% if record and token %}'{{ host_url }}{{ url_for('minutes.attend', token=token.token) }}'{% else %}null{% endif %},
-       {{ record.id if record else 'null' }}
-     )" x-init="init()">
+     x-data="minutesRecorder()" x-init="init()">
 
   <!-- Header -->
   <div class="flex items-center gap-4">
@@ -279,7 +282,12 @@
 
 {% block scripts %}
 <script>
-function minutesRecorder(initialTranscript, isAlreadyStarted, initialAttendUrl, initialMeetingId) {
+function minutesRecorder() {
+  var __d = window.__minutesData || {};
+  var initialTranscript  = __d.initialTranscript  || '';
+  var isAlreadyStarted   = __d.isAlreadyStarted   || false;
+  var initialAttendUrl   = __d.initialAttendUrl   || null;
+  var initialMeetingId   = __d.initialMeetingId   || null;
   return {
     // ── recording state ──────────────────────────────────────────
     isRecording:    false,

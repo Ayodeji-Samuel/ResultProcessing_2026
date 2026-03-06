@@ -5,6 +5,7 @@ from flask_wtf.csrf import CSRFProtect
 from config import config
 import mimetypes
 import os
+import time
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -69,9 +70,30 @@ def create_app(config_name='default'):
     def landing_redirect():
         return redirect(url_for('landing'), 301)
 
-    # Create database tables
+    # Create database tables.
+    # On local MySQL (e.g. Laragon) a concurrent DDL statement on an existing
+    # table causes error 1684 during db.create_all()'s table inspection.
+    # To avoid this, we check whether all tables already exist first and only
+    # call create_all() when genuinely needed (e.g. first-run / new table added).
     with app.app_context():
-        db.create_all()
+        from sqlalchemy import inspect as _sa_inspect
+        _inspector = _sa_inspect(db.engine)
+        _existing = set(_inspector.get_table_names())
+        _model_tables = set(db.metadata.tables.keys())
+        _missing = _model_tables - _existing
+
+        if _missing:
+            # Some tables are absent — create them (retry on transient error 1684)
+            for _attempt in range(6):
+                try:
+                    db.create_all()
+                    break
+                except Exception as _e:
+                    if '1684' in str(_e) and _attempt < 5:
+                        time.sleep(3)
+                        continue
+                    raise
+        # else: all tables exist — skip create_all entirely (avoids error 1684)
         
         from app.models import GradingSystem
         
