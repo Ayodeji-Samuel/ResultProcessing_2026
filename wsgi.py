@@ -37,7 +37,7 @@ if _sub_path:
     # x_prefix=0 because DispatcherMiddleware already sets SCRIPT_NAME from the
     # matched prefix — letting ProxyFix also apply X-Forwarded-Prefix would
     # double the prefix.
-    application = ProxyFix(_dispatcher, x_for=1, x_proto=1, x_host=1, x_prefix=0)
+    application = ProxyFix(_dispatcher, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 else:
     # Standard root deployment (DigitalOcean App Platform, Railway, Render, etc.)
     # ProxyFix handles X-Forwarded-For / X-Forwarded-Proto from the load balancer.
