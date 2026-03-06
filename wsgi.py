@@ -31,7 +31,7 @@ if _sub_path:
     # NOT start with the prefix (avoids silently serving the app at root too).
     app.config['APPLICATION_ROOT'] = _sub_path
     _dispatcher = DispatcherMiddleware(
-        Response('Not Found', status=404),
+        app,
         {_sub_path: app},
     )
     # x_prefix=0 because DispatcherMiddleware already sets SCRIPT_NAME from the
