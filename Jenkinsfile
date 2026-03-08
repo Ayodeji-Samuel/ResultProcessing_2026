@@ -68,7 +68,7 @@ pipeline {
             steps {
                 sh """
                     cd ${RELEASES_DIR}
-                    ls -dt */ | tail -n +6 | xargs -r rm -rf
+                    ls -dt 20*/ | tail -n +6 | xargs -r rm -rf 
                 """
             }
         }        
