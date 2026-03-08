@@ -143,6 +143,7 @@ class Student(db.Model):
     level = db.Column(db.Integer, nullable=False)  # 100, 200, 300, 400
     session_id = db.Column(db.Integer, db.ForeignKey('academic_sessions.id'), nullable=False)
     is_active = db.Column(db.Boolean, default=True)
+    remarks = db.Column(db.String(64))  # e.g. "Non-Graduating", "Graduated" — set during session promotion
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -153,6 +154,14 @@ class Student(db.Model):
     __table_args__ = (
         db.UniqueConstraint('matric_number', 'session_id', name='unique_matric_session'),
     )
+
+    @property
+    def is_non_graduating(self):
+        return self.remarks == 'Non-Graduating'
+
+    @property
+    def is_graduated(self):
+        return self.remarks == 'Graduated'
     
     @property
     def full_name(self):

@@ -299,3 +299,33 @@ def update_system():
     db.session.commit()
     flash('System settings updated.', 'success')
     return redirect(url_for('settings.system'))
+
+
+@settings_bp.route('/scan-carryovers', methods=['POST'])
+@login_required
+@admin_or_hod_required
+def scan_carryovers():
+    """Scan all existing results and back-fill missing carryover records.
+    
+    This is useful after importing past/backlog results that were entered
+    before the carryover tracking system was in place.  Safe to run
+    multiple times — duplicates are automatically skipped.
+    """
+    from app.utils.grading import scan_and_create_past_carryovers
+
+    try:
+        result = scan_and_create_past_carryovers()
+        parts = []
+        if result['created_from_failures']:
+            parts.append(f"{result['created_from_failures']} carryover record(s) created from failures")
+        if result['cleared']:
+            parts.append(f"{result['cleared']} carryover(s) auto-cleared (passed later)")
+        if result['flagged_carryover_results']:
+            parts.append(f"{result['flagged_carryover_results']} result(s) flagged as carryover")
+        if not parts:
+            parts.append("No new carryovers detected — everything is already up to date")
+        flash('. '.join(parts) + '.', 'success')
+    except Exception as e:
+        flash(f'Error scanning carryovers: {str(e)}', 'danger')
+
+    return redirect(url_for('settings.system'))

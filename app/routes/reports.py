@@ -5,7 +5,7 @@ from app.models import Student, Course, Result, AcademicSession, Carryover, User
 from app.utils import (
     generate_spreadsheet_pdf, generate_student_result_pdf,
     calculate_gpa, get_credit_units_summary, format_score_grade,
-    get_accessible_filters
+    get_accessible_filters, get_carryover_students_for_level
 )
 from config import Config
 from io import BytesIO
@@ -58,13 +58,24 @@ def spreadsheet():
             flash('Please select level, program, and semester.', 'danger')
             return redirect(url_for('reports.spreadsheet'))
         
-        # Get students
-        students = Student.query.filter_by(
+        # Get regular students at this level/program
+        regular_students = Student.query.filter_by(
             level=level,
             program=program,
             session_id=current_session.id
         ).order_by(Student.matric_number).all()
-        
+
+        # Get carryover students from higher levels who have results
+        # for courses at this level (e.g. 400L students retaking 100L courses)
+        carryover_students = get_carryover_students_for_level(
+            level, program, current_session.id
+        )
+
+        # Combine without duplicates
+        regular_ids = {s.id for s in regular_students}
+        unique_carryover = [s for s in carryover_students if s.id not in regular_ids]
+        students = regular_students + unique_carryover
+
         if not students:
             flash('No students found for the selected criteria.', 'warning')
             return redirect(url_for('reports.spreadsheet'))
@@ -129,7 +140,7 @@ def spreadsheet():
                         )
                         first_sem_results.append(result)
                     else:
-                        student_row['first_semester'][course.course_code] = '-'
+                        student_row['first_semester'][course.course_code] = 'NR'
                 
                 if first_sem_results:
                     summary = get_credit_units_summary(first_sem_results)
@@ -155,7 +166,7 @@ def spreadsheet():
                         )
                         second_sem_results.append(result)
                     else:
-                        student_row['second_semester'][course.course_code] = '-'
+                        student_row['second_semester'][course.course_code] = 'NR'
                 
                 if second_sem_results:
                     summary = get_credit_units_summary(second_sem_results)

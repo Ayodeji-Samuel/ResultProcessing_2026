@@ -372,7 +372,7 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10,
             # First semester courses
             first_sem_data = student.get('first_semester', {})
             for course in first_sem_courses:
-                course_result = first_sem_data.get(course['code'], '-')
+                course_result = first_sem_data.get(course['code'], 'NR')
                 row.append(course_result)
             
             # First semester summary
@@ -385,7 +385,7 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10,
             # Second semester courses
             second_sem_data = student.get('second_semester', {})
             for course in second_sem_courses:
-                course_result = second_sem_data.get(course['code'], '-')
+                course_result = second_sem_data.get(course['code'], 'NR')
                 row.append(course_result)
             
             # Second semester summary
@@ -418,7 +418,7 @@ def generate_spreadsheet_pdf(data, config, signatories=None, font_size=10,
             
             # Course scores
             for course in courses_to_show:
-                course_result = semester_data.get(course['code'], '-')
+                course_result = semester_data.get(course['code'], 'NR')
                 row.append(course_result)
             
             # Summary columns

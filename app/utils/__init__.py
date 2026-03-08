@@ -12,7 +12,11 @@ from app.utils.grading import (
     get_outstanding_carryovers,
     validate_carryover_registration,
     check_carryover_has_score,
-    get_accessible_filters
+    get_accessible_filters,
+    get_carryover_students_for_level,
+    get_required_courses_for_level_program,
+    scan_and_create_past_carryovers,
+    promote_students_to_new_session,
 )
 
 from app.utils.csv_processor import (
@@ -76,11 +80,18 @@ __all__ = [
     'validate_carryover_registration',
     'check_carryover_has_score',
     'get_accessible_filters',
+    'get_carryover_students_for_level',
+    'get_required_courses_for_level_program',
+    'scan_and_create_past_carryovers',
+    'promote_students_to_new_session',
     'allowed_file',
     'parse_student_csv',
     'parse_results_csv',
     'generate_sample_student_csv',
     'generate_sample_results_csv',
     'generate_spreadsheet_pdf',
-    'generate_student_result_pdf'
+    'generate_student_result_pdf',
+    'extract_results_from_pdf',
+    'parse_past_results_csv',
+    'generate_sample_past_results_csv',
 ]

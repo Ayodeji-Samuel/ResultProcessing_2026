@@ -153,13 +153,21 @@ def upload():
         
         for record in records:
             try:
-                # Find student
+                # Find student - first try exact level/program match
                 student = Student.query.filter_by(
                     matric_number=record['matric_number'],
                     session_id=current_session.id,
                     level=course.level,
                     program=course.program
                 ).first()
+                
+                # If not found, check for carryover student at a higher level
+                # (e.g. a 400L student retaking a 100L course)
+                if not student:
+                    student = Student.query.filter_by(
+                        matric_number=record['matric_number'],
+                        session_id=current_session.id
+                    ).filter(Student.level > course.level).first()
                 
                 if not student:
                     not_found.append(record['matric_number'])
@@ -170,12 +178,15 @@ def upload():
                 total_score = record['total_score']
                 grade, grade_point = get_grade_info(total_score, degree_type)
                 
-                # Check if this is a carryover course for the student
-                is_carryover = Carryover.query.filter_by(
-                    student_matric=student.matric_number,
-                    course_id=course.id,
-                    is_cleared=False
-                ).first() is not None
+                # Determine carryover status: either from the Carryover table
+                # or inferred because student level > course level
+                is_carryover = (student.level > course.level)
+                if not is_carryover:
+                    is_carryover = Carryover.query.filter_by(
+                        student_matric=student.matric_number,
+                        course_id=course.id,
+                        is_cleared=False
+                    ).first() is not None
                 
                 # Check if result exists
                 existing = Result.query.filter_by(
@@ -397,11 +408,40 @@ def manual_entry(course_id):
         return redirect(url_for('results.view_course', course_id=course_id))
     
     # 3. Get students for this course (matching level and program)
-    students = Student.query.filter_by(
+    #    Also include carryover students from higher levels
+    regular_students = Student.query.filter_by(
         level=course.level,
         program=course.program,
         session_id=current_session.id
     ).order_by(Student.matric_number).all()
+
+    # Find higher-level students who have outstanding carryovers for this course
+    # or already have results for this course in the current session
+    from app.utils import get_carryover_students_for_level
+    carryover_students_for_level = get_carryover_students_for_level(
+        course.level, course.program, current_session.id
+    )
+    # Also include students with outstanding carryovers for THIS specific course
+    carryover_matric_for_course = {
+        c.student_matric for c in Carryover.query.filter_by(
+            course_id=course_id, is_cleared=False
+        ).all()
+    }
+    extra_carryover = Student.query.filter(
+        Student.matric_number.in_(carryover_matric_for_course),
+        Student.session_id == current_session.id,
+        Student.level > course.level,
+    ).order_by(Student.matric_number).all()
+
+    regular_ids = {s.id for s in regular_students}
+    seen = set(regular_ids)
+    unique_carryover = []
+    for s in carryover_students_for_level + extra_carryover:
+        if s.id not in seen:
+            seen.add(s.id)
+            unique_carryover.append(s)
+
+    students = regular_students + unique_carryover
     
     # 4. Build lookup dictionaries for existing data
     existing_results = {
@@ -412,6 +452,7 @@ def manual_entry(course_id):
     }
     
     # Get carryover status - students who failed this course previously
+    # OR students at a higher level than the course (automatically carryover)
     carryover_matrics = {
         c.student_matric for c in Carryover.query.filter_by(
             course_id=course_id,
@@ -419,7 +460,8 @@ def manual_entry(course_id):
         ).all()
     }
     carryover_status = {
-        s.id: s.matric_number in carryover_matrics for s in students
+        s.id: (s.matric_number in carryover_matrics or s.level > course.level)
+        for s in students
     }
     
     # 5. Handle POST - Save results

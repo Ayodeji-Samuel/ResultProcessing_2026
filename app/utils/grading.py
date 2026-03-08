@@ -388,3 +388,334 @@ def check_carryover_has_score(student_matric, session_id):
             untaken.append(carryover)
     
     return (len(untaken) == 0, untaken)
+
+
+def get_carryover_students_for_level(level, program, session_id):
+    """
+    Find students from higher levels who have results for courses at the given
+    level/program in the given session.  These are carryover students who should
+    appear on the lower-level spreadsheet.
+
+    Args:
+        level: The target level (e.g. 100)
+        program: The programme name
+        session_id: The current academic session ID
+
+    Returns:
+        list[Student]: Student objects from higher levels with results at this level
+    """
+    from app.models import Student, Result, Course
+    from app import db
+
+    # Sub-query: course IDs at the target level/program
+    target_course_ids = db.session.query(Course.id).filter(
+        Course.level == level,
+        Course.program == program,
+        Course.is_active == True
+    ).subquery()
+
+    # Find distinct student IDs from higher levels who have results for these courses
+    carryover_student_ids = (
+        db.session.query(Result.student_id)
+        .join(Student, Result.student_id == Student.id)
+        .filter(
+            Result.course_id.in_(db.session.query(target_course_ids.c.id)),
+            Result.session_id == session_id,
+            Student.session_id == session_id,
+            Student.level > level,
+        )
+        .distinct()
+        .all()
+    )
+    carryover_ids = [sid[0] for sid in carryover_student_ids]
+
+    if not carryover_ids:
+        return []
+
+    return (
+        Student.query
+        .filter(Student.id.in_(carryover_ids))
+        .order_by(Student.matric_number)
+        .all()
+    )
+
+
+def get_required_courses_for_level_program(level, program, semester=None):
+    """
+    Return all active courses that must be taken for a given level/program.
+
+    Args:
+        level: The level (100, 200, 300, 400)
+        program: The programme name
+        semester: Optional semester filter (1 or 2). If None, return both.
+
+    Returns:
+        list[Course]: List of Course objects
+    """
+    from app.models import Course
+
+    q = Course.query.filter_by(level=level, program=program, is_active=True)
+    if semester is not None:
+        q = q.filter_by(semester=semester)
+    return q.order_by(Course.semester, Course.course_code).all()
+
+
+def scan_and_create_past_carryovers(session_id=None):
+    """
+    Scan existing results and create missing Carryover records for:
+      1. Any student who has a failing grade (F) and no corresponding Carryover entry.
+      2. Any student at a higher level who took a lower-level course (mark as carryover).
+
+    Designed to back-fill carryover tracking for results that were uploaded
+    before the tracking system was in place.
+
+    Args:
+        session_id: If provided, only scan results from this session.
+                    If None, scan ALL sessions.
+
+    Returns:
+        dict: {'created_from_failures': int, 'flagged_carryover_results': int}
+    """
+    from app.models import Student, Result, Course, Carryover
+    from app import db
+
+    filters = []
+    if session_id is not None:
+        filters.append(Result.session_id == session_id)
+
+    # ------------------------------------------------------------------
+    # 1. Create Carryover records for failed results
+    # ------------------------------------------------------------------
+    failed_rows = (
+        db.session.query(Result, Student, Course)
+        .join(Student, Result.student_id == Student.id)
+        .join(Course, Result.course_id == Course.id)
+        .filter(Result.grade == 'F', *filters)
+        .all()
+    )
+
+    created_failures = 0
+    for result, student, course in failed_rows:
+        existing = Carryover.query.filter_by(
+            student_matric=student.matric_number,
+            course_id=course.id,
+            original_session_id=result.session_id,
+        ).first()
+        if not existing:
+            co = Carryover(
+                student_matric=student.matric_number,
+                course_id=course.id,
+                original_session_id=result.session_id,
+                original_level=student.level,
+                is_cleared=False,
+            )
+            db.session.add(co)
+            created_failures += 1
+
+    # ------------------------------------------------------------------
+    # 2. Check if any of those carryovers were passed in a later session
+    # ------------------------------------------------------------------
+    # Flush so the new records are visible in queries
+    db.session.flush()
+
+    uncleared = Carryover.query.filter_by(is_cleared=False).all()
+    cleared_count = 0
+    for co in uncleared:
+        # Find a passing result for this student + course in ANY session
+        passing = (
+            db.session.query(Result)
+            .join(Student, Result.student_id == Student.id)
+            .filter(
+                Student.matric_number == co.student_matric,
+                Result.course_id == co.course_id,
+                Result.grade != 'F',
+            )
+            .order_by(Result.session_id.desc())
+            .first()
+        )
+        if passing:
+            co.is_cleared = True
+            co.cleared_session_id = passing.session_id
+            co.cleared_result_id = passing.id
+            cleared_count += 1
+
+    # ------------------------------------------------------------------
+    # 3. Flag Result.is_carryover for higher-level students taking
+    #    lower-level courses
+    # ------------------------------------------------------------------
+    all_results = (
+        db.session.query(Result, Student, Course)
+        .join(Student, Result.student_id == Student.id)
+        .join(Course, Result.course_id == Course.id)
+        .filter(*filters)
+        .all()
+    )
+
+    flagged = 0
+    for result, student, course in all_results:
+        if student.level > course.level and not result.is_carryover:
+            result.is_carryover = True
+            flagged += 1
+
+    db.session.commit()
+    return {
+        'created_from_failures': created_failures,
+        'cleared': cleared_count,
+        'flagged_carryover_results': flagged,
+    }
+
+
+def promote_students_to_new_session(from_session_id, to_session_id, db):
+    """
+    Promote all active students from one academic session into the next.
+
+    Level progression rules
+    -----------------------
+    * 100L → 200L
+    * 200L → 300L
+    * 300L → 400L
+    * 400L with **no outstanding carryovers** → Graduated
+      (no Student row is created in to_session; matric number is returned in
+      the 'graduated' list so the caller can display/log them)
+    * 400L with **outstanding uncleared carryovers** → stays at 400L in the
+      new session with ``Student.remarks = 'Non-Graduating'``
+
+    The function is **idempotent**: if a student's matric number already
+    exists in to_session it is skipped and counted in 'skipped'.
+
+    A ``StudentAcademicHistory`` snapshot is written for each student's
+    from_session data (GPA, credit units, standing) before the new row is
+    created — skipped if a history record for that session already exists.
+
+    Parameters
+    ----------
+    from_session_id : int
+        PK of the AcademicSession students will be promoted FROM.
+    to_session_id : int
+        PK of the AcademicSession students will be promoted INTO.
+    db : flask_sqlalchemy.SQLAlchemy
+        The db extension object (passed in so this function has no
+        circular-import dependency on ``app``).
+
+    Returns
+    -------
+    dict
+        {
+            'promoted'      : int,        # moved up one level (100→200, 200→300, 300→400)
+            'non_graduating': int,        # 400L students with carryovers kept at 400L
+            'graduated'     : list[str],  # matric numbers of cleanly graduating 400L students
+            'skipped'       : int,        # students already present in to_session
+        }
+    """
+    from app.models import (
+        Student, Carryover, Result, StudentAcademicHistory
+    )
+
+    students = Student.query.filter_by(
+        session_id=from_session_id,
+        is_active=True
+    ).all()
+
+    promoted = 0
+    non_graduating = 0
+    graduated = []
+    skipped = 0
+
+    for student in students:
+        # ── Idempotency check ──────────────────────────────────────────────
+        already_exists = Student.query.filter_by(
+            matric_number=student.matric_number,
+            session_id=to_session_id
+        ).first()
+        if already_exists:
+            skipped += 1
+            continue
+
+        # ── Academic history snapshot for from_session ────────────────────
+        if not StudentAcademicHistory.query.filter_by(
+            student_matric=student.matric_number,
+            session_id=from_session_id
+        ).first():
+            all_results = Result.query.filter_by(
+                student_id=student.id,
+                session_id=from_session_id
+            ).all()
+            first_sem = [r for r in all_results if r.course.semester == 1]
+            second_sem = [r for r in all_results if r.course.semester == 2]
+            f1_gpa = calculate_gpa(first_sem)
+            f2_gpa = calculate_gpa(second_sem)
+            overall_gpa = calculate_gpa(all_results)
+            summary = (
+                get_credit_units_summary(all_results)
+                if all_results
+                else {'passed': 0, 'failed': 0, 'total': 0}
+            )
+
+            if summary['total'] == 0:
+                hist_remarks = 'No Results'
+            elif overall_gpa >= 1.50:
+                hist_remarks = 'Good Standing'
+            elif overall_gpa >= 1.00:
+                hist_remarks = 'Probation'
+            else:
+                hist_remarks = 'At Risk'
+
+            db.session.add(StudentAcademicHistory(
+                student_matric=student.matric_number,
+                session_id=from_session_id,
+                level=student.level,
+                program=student.program,
+                first_semester_gpa=f1_gpa,
+                second_semester_gpa=f2_gpa,
+                cgpa=overall_gpa,
+                total_units_registered=summary['total'],
+                total_units_passed=summary['passed'],
+                total_units_failed=summary['failed'],
+                remarks=hist_remarks,
+            ))
+
+        # ── Determine new level & remarks ─────────────────────────────────
+        if student.level < 400:
+            # Normal level progression
+            new_level = student.level + 100
+            new_remarks = None
+            promoted += 1
+
+        else:
+            # Maximum level (400L) — check for outstanding carryovers
+            outstanding_count = Carryover.query.filter_by(
+                student_matric=student.matric_number,
+                is_cleared=False
+            ).count()
+
+            if outstanding_count > 0:
+                # Cannot graduate — remain at 400L as non-graduating
+                new_level = 400
+                new_remarks = 'Non-Graduating'
+                non_graduating += 1
+            else:
+                # Clean graduation — do not create a row in the new session
+                graduated.append(student.matric_number)
+                continue  # skip Student creation
+
+        # ── Create new Student record in to_session ───────────────────────
+        db.session.add(Student(
+            matric_number=student.matric_number,
+            surname=student.surname,
+            first_name=student.first_name,
+            other_names=student.other_names,
+            gender=student.gender,
+            program=student.program,
+            level=new_level,
+            session_id=to_session_id,
+            is_active=True,
+            remarks=new_remarks,
+        ))
+
+    db.session.commit()
+    return {
+        'promoted': promoted,
+        'non_graduating': non_graduating,
+        'graduated': graduated,
+        'skipped': skipped,
+    }

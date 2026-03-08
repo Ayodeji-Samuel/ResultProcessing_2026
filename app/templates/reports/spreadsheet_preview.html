@@ -311,8 +311,9 @@
                         
                         <!-- First Semester Courses -->
                         {% for course in first_semester_courses %}
-                        <td class="px-2 py-3 text-center border-l border-r border-gray-200 text-gray-700">
-                            {{ data.first_semester.get(course.code, '-') }}
+                        {% set cell_val = data.first_semester.get(course.code, 'NR') %}
+                        <td class="px-2 py-3 text-center border-l border-r border-gray-200 {{ 'text-gray-400 italic' if cell_val == 'NR' else 'text-gray-700' }}">
+                            {{ cell_val }}
                         </td>
                         {% endfor %}
                         
@@ -324,8 +325,9 @@
                         
                         <!-- Second Semester Courses -->
                         {% for course in second_semester_courses %}
-                        <td class="px-2 py-3 text-center border-l border-r border-gray-200 text-gray-700">
-                            {{ data.second_semester.get(course.code, '-') }}
+                        {% set cell_val = data.second_semester.get(course.code, 'NR') %}
+                        <td class="px-2 py-3 text-center border-l border-r border-gray-200 {{ 'text-gray-400 italic' if cell_val == 'NR' else 'text-gray-700' }}">
+                            {{ cell_val }}
                         </td>
                         {% endfor %}
                         
@@ -432,7 +434,7 @@
                                    'bg-red-100 text-red-800' }}">
                                 {{ result.total_score|round(1) }} ({{ result.grade }})
                             </span>
-                            {% else %}-{% endif %}
+                            {% else %}<span class="text-gray-400 italic text-xs">NR</span>{% endif %}
                         </td>
                         {% endfor %}
                         <td class="px-3 py-3 text-center border-l border-gray-200 font-bold text-red-600">{{ data.cuf }}</td>
@@ -532,7 +534,7 @@
         </h2>
     </div>
     <div class="p-6">
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
             <div class="text-center p-4 bg-green-50 rounded-lg border border-green-200">
                 <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-green-100 text-green-800 mb-2">A</span>
                 <p class="text-xs text-gray-600 font-medium">70-100</p>
@@ -562,6 +564,11 @@
                 <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-red-100 text-red-800 mb-2">F</span>
                 <p class="text-xs text-gray-600 font-medium">0-39</p>
                 <p class="text-xs text-gray-500">(0 points)</p>
+            </div>
+            <div class="text-center p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-slate-100 text-slate-500 mb-2 italic">NR</span>
+                <p class="text-xs text-gray-600 font-medium">Not Registered</p>
+                <p class="text-xs text-gray-500">(not counted)</p>
             </div>
         </div>
     </div>

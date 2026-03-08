@@ -264,6 +264,31 @@
     </div>
     {% endif %}
 
+    <!-- Carryover Scanner -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div class="border-b border-gray-200 bg-gray-50 px-5 py-3.5">
+        <h3 class="font-semibold text-gray-800 text-sm flex items-center gap-2">
+          <i class="ri-refresh-line text-primary-500"></i> Carryover Scanner
+        </h3>
+      </div>
+      <div class="p-5">
+        <p class="text-sm text-gray-600 mb-3">
+          Scan all existing results and back-fill missing carryover records.
+          Useful after uploading past / backlog results. Safe to run multiple times — duplicates are skipped.
+        </p>
+        <form method="POST" action="{{ url_for('settings.scan_carryovers') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit"
+                  class="w-full inline-flex items-center justify-center gap-2 px-4 py-2 border border-blue-300 text-blue-700 hover:bg-blue-50 text-sm font-medium rounded-lg transition-colors">
+            <i class="ri-scan-line"></i> Scan &amp; Sync Carryovers
+          </button>
+        </form>
+        <p class="text-xs text-gray-400 mt-3">
+          Creates carryover entries for failed courses, auto-clears passed ones, and flags higher-level students taking lower-level courses.
+        </p>
+      </div>
+    </div>
+
     <!-- Academic Sessions list -->
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <div class="border-b border-gray-200 bg-gray-50 px-5 py-3.5">
