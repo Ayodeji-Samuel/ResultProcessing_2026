@@ -398,19 +398,27 @@ def get_carryover_students_for_level(level, program, session_id):
 
     Args:
         level: The target level (e.g. 100)
-        program: The programme name
+        program: The programme name, or a list of programme names.
         session_id: The current academic session ID
 
     Returns:
         list[Student]: Student objects from higher levels with results at this level
     """
-    from app.models import Student, Result, Course
+    from app.models import Student, Result, Course, CourseProgram
     from app import db
 
-    # Sub-query: course IDs at the target level/program
+    # Support a single program string or a list of programs
+    programs = program if isinstance(program, list) else [program]
+
+    # Include courses shared with these programs via CourseProgram
+    shared_ids = db.session.query(CourseProgram.course_id).filter(
+        CourseProgram.program.in_(programs)
+    )
+
+    # Sub-query: course IDs at the target level/program(s)
     target_course_ids = db.session.query(Course.id).filter(
         Course.level == level,
-        Course.program == program,
+        db.or_(Course.program.in_(programs), Course.id.in_(shared_ids)),
         Course.is_active == True
     ).subquery()
 
@@ -452,11 +460,19 @@ def get_required_courses_for_level_program(level, program, semester=None):
     Returns:
         list[Course]: List of Course objects
     """
-    from app.models import Course
+    from app.models import Course, CourseProgram
+    from app import db
 
-    q = Course.query.filter_by(level=level, program=program, is_active=True)
+    shared_ids = db.session.query(CourseProgram.course_id).filter(
+        CourseProgram.program == program
+    )
+    q = Course.query.filter(
+        Course.level == level,
+        db.or_(Course.program == program, Course.id.in_(shared_ids)),
+        Course.is_active == True
+    )
     if semester is not None:
-        q = q.filter_by(semester=semester)
+        q = q.filter(Course.semester == semester)
     return q.order_by(Course.semester, Course.course_code).all()
 
 

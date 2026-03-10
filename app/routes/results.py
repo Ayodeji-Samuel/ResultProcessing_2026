@@ -42,8 +42,14 @@ def index():
     if level_access:
         query = query.filter(Course.level == level_access)
     if program_access:
-        query = query.filter(Course.program.in_(program_access))
-    
+        from app.models import CourseProgram
+        _shared = db.session.query(CourseProgram.course_id).filter(
+            CourseProgram.program.in_(program_access)
+        )
+        query = query.filter(
+            db.or_(Course.program.in_(program_access), Course.id.in_(_shared))
+        )
+
     # Apply user filters
     if matric_filter:
         query = query.filter(Student.matric_number.ilike(f'%{matric_filter}%'))
@@ -93,8 +99,14 @@ def upload():
     if level_access:
         course_query = course_query.filter_by(level=level_access)
     if program_access:
-        course_query = course_query.filter(Course.program.in_(program_access))
-    
+        from app.models import CourseProgram
+        _shared = db.session.query(CourseProgram.course_id).filter(
+            CourseProgram.program.in_(program_access)
+        )
+        course_query = course_query.filter(
+            db.or_(Course.program.in_(program_access), Course.id.in_(_shared))
+        )
+
     courses = course_query.order_by(Course.level, Course.semester, Course.course_code).all()
     
     if request.method == 'POST':
@@ -111,10 +123,10 @@ def upload():
         if level_access and course.level != level_access:
             flash('Access denied.', 'danger')
             return redirect(url_for('results.upload'))
-        if program_access and course.program not in program_access:
+        if program_access and not any(p in program_access for p in course.get_all_programs()):
             flash('Access denied.', 'danger')
             return redirect(url_for('results.upload'))
-        
+
         # Check if results are locked
         locked_count = Result.query.filter_by(
             course_id=course_id,
@@ -153,14 +165,14 @@ def upload():
         
         for record in records:
             try:
-                # Find student - first try exact level/program match
-                student = Student.query.filter_by(
-                    matric_number=record['matric_number'],
-                    session_id=current_session.id,
-                    level=course.level,
-                    program=course.program
+                # Find student - search across all programs using this course
+                student = Student.query.filter(
+                    Student.matric_number == record['matric_number'],
+                    Student.session_id == current_session.id,
+                    Student.level == course.level,
+                    Student.program.in_(course.get_all_programs())
                 ).first()
-                
+
                 # If not found, check for carryover student at a higher level
                 # (e.g. a 400L student retaking a 100L course)
                 if not student:
@@ -342,10 +354,10 @@ def view_course(course_id):
     if level_access and course.level != level_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
-    if program_access and course.program not in program_access:
+    if program_access and not any(p in program_access for p in course.get_all_programs()):
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
-    
+
     # Get results for this course
     results = Result.query.filter_by(
         course_id=course_id,
@@ -392,34 +404,34 @@ def manual_entry(course_id):
     if level_access and course.level != level_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
-    if program_access and course.program not in program_access:
+    if program_access and not any(p in program_access for p in course.get_all_programs()):
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
-    
+
     # Check if results are locked
     locked_count = Result.query.filter_by(
         course_id=course_id,
         session_id=current_session.id,
         is_locked=True
     ).count()
-    
+
     if locked_count > 0 and not current_user.is_hod():
         flash(f'Results for {course.course_code} are locked. Only HoD can unlock them.', 'danger')
         return redirect(url_for('results.view_course', course_id=course_id))
-    
-    # 3. Get students for this course (matching level and program)
+
+    # 3. Get students for this course (matching level and all shared programs)
     #    Also include carryover students from higher levels
-    regular_students = Student.query.filter_by(
-        level=course.level,
-        program=course.program,
-        session_id=current_session.id
+    regular_students = Student.query.filter(
+        Student.level == course.level,
+        Student.program.in_(course.get_all_programs()),
+        Student.session_id == current_session.id
     ).order_by(Student.matric_number).all()
 
     # Find higher-level students who have outstanding carryovers for this course
     # or already have results for this course in the current session
     from app.utils import get_carryover_students_for_level
     carryover_students_for_level = get_carryover_students_for_level(
-        course.level, course.program, current_session.id
+        course.level, course.get_all_programs(), current_session.id
     )
     # Also include students with outstanding carryovers for THIS specific course
     carryover_matric_for_course = {
@@ -666,7 +678,7 @@ def delete_result(result_id):
     if level_access and course.level != level_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
-    if program_access and course.program not in program_access:
+    if program_access and not any(p in program_access for p in course.get_all_programs()):
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
     
@@ -695,7 +707,7 @@ def edit_result(result_id):
     if level_access and course.level != level_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
-    if program_access and course.program not in program_access:
+    if program_access and not any(p in program_access for p in course.get_all_programs()):
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
     
@@ -781,7 +793,7 @@ def clear_course_results(course_id):
     if level_access and course.level != level_access:
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
-    if program_access and course.program not in program_access:
+    if program_access and not any(p in program_access for p in course.get_all_programs()):
         flash('Access denied.', 'danger')
         return redirect(url_for('results.index'))
     
@@ -825,7 +837,7 @@ def approve_course_results(course_id):
         # HoD and Level Adviser can approve any course in their scope
         level_access, program_access = get_accessible_filters()
         if not level_access or course.level == level_access:
-            if not program_access or course.program in program_access:
+            if not program_access or any(p in program_access for p in course.get_all_programs()):
                 can_approve = True
     else:
         # Regular lecturer must be assigned to the course

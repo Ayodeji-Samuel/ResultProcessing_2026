@@ -97,7 +97,9 @@
                     </td>
                     <td class="px-6 py-4">
                         <p class="text-sm font-medium text-gray-900">{{ course.course_title }}</p>
-                        <p class="text-xs text-gray-500">{{ course.program }}</p>
+                        <p class="text-xs text-gray-500">
+                            {{ course.program }}{% if course.shared_programs %} <span class="text-blue-500">(+ {{ course.shared_programs|map(attribute='program')|join(', ') }})</span>{% endif %}
+                        </p>
                     </td>
                     <td class="px-6 py-4">
                         <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs font-bold">{{ course.credit_unit }} Unit{{ 's' if course.credit_unit > 1 }}</span>

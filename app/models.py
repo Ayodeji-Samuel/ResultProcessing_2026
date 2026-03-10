@@ -182,7 +182,7 @@ class Course(db.Model):
     __tablename__ = 'courses'
     
     id = db.Column(db.Integer, primary_key=True)
-    course_code = db.Column(db.String(10), nullable=False, index=True)
+    course_code = db.Column(db.String(20), nullable=False, index=True)
     course_title = db.Column(db.String(128), nullable=False)
     credit_unit = db.Column(db.Integer, nullable=False)
     semester = db.Column(db.Integer, nullable=False)  # 1 or 2
@@ -206,8 +206,40 @@ class Course(db.Model):
         db.UniqueConstraint('course_code', 'program', 'level', name='unique_course_program_level'),
     )
     
+    def get_all_programs(self):
+        """Return list of all programs this course serves (primary + any shared ones)."""
+        programs = [self.program]
+        for sp in self.shared_programs:
+            if sp.program not in programs:
+                programs.append(sp.program)
+        return programs
+
     def __repr__(self):
         return f'<Course {self.course_code}>'
+
+
+class CourseProgram(db.Model):
+    """Additional programs that share a course beyond its primary program.
+
+    When the same course (e.g. CSC201) is taught to students from multiple
+    programs by the same lecturer, the extra programs are recorded here
+    instead of creating duplicate Course entries.
+    """
+    __tablename__ = 'course_programs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
+    program = db.Column(db.String(64), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    course = db.relationship('Course', backref='shared_programs')
+
+    __table_args__ = (
+        db.UniqueConstraint('course_id', 'program', name='uq_course_shared_program'),
+    )
+
+    def __repr__(self):
+        return f'<CourseProgram course={self.course_id} program={self.program}>'
 
 
 class CourseAssignment(db.Model):
@@ -425,7 +457,7 @@ class ResultAlteration(db.Model):
     result_id = db.Column(db.Integer, db.ForeignKey('results.id'), nullable=False)
     student_matric = db.Column(db.String(30), nullable=False, index=True)
     student_name = db.Column(db.String(256))
-    course_code = db.Column(db.String(10), nullable=False)
+    course_code = db.Column(db.String(20), nullable=False)
     course_title = db.Column(db.String(128))
     session_name = db.Column(db.String(20))
     

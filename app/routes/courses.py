@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 from app import db
-from app.models import Course
+from app.models import Course, CourseProgram
 from config import Config
 
 from app.utils import get_accessible_filters
@@ -25,13 +25,23 @@ def index():
     if level_access:
         query = query.filter_by(level=level_access)
     if program_access:
-        query = query.filter(Course.program.in_(program_access))
-    
+        _shared = db.session.query(CourseProgram.course_id).filter(
+            CourseProgram.program.in_(program_access)
+        )
+        query = query.filter(
+            db.or_(Course.program.in_(program_access), Course.id.in_(_shared))
+        )
+
     # Apply user filters
     if level_filter and not level_access:
         query = query.filter_by(level=level_filter)
     if program_filter and not program_access:
-        query = query.filter_by(program=program_filter)
+        _shared = db.session.query(CourseProgram.course_id).filter(
+            CourseProgram.program == program_filter
+        )
+        query = query.filter(
+            db.or_(Course.program == program_filter, Course.id.in_(_shared))
+        )
     if semester_filter:
         query = query.filter_by(semester=semester_filter)
     
@@ -80,17 +90,40 @@ def create():
             flash('All required fields must be filled.', 'danger')
             return redirect(url_for('courses.create'))
         
-        # Check duplicate
-        existing = Course.query.filter_by(
+        # Check duplicate for same program+level
+        existing_same = Course.query.filter_by(
             course_code=course_code,
             program=program,
             level=level
         ).first()
-        
-        if existing:
+
+        if existing_same:
             flash('A course with this code already exists for this program and level.', 'danger')
             return redirect(url_for('courses.create'))
-        
+
+        # Check if same course exists for a different program — share it instead of duplicating
+        existing_other = Course.query.filter(
+            Course.course_code == course_code,
+            Course.level == level,
+            Course.program != program
+        ).first()
+
+        if existing_other:
+            already_shared = CourseProgram.query.filter_by(
+                course_id=existing_other.id, program=program
+            ).first()
+            if not already_shared:
+                db.session.add(CourseProgram(course_id=existing_other.id, program=program))
+                db.session.commit()
+                flash(
+                    f'Course {course_code} already exists under "{existing_other.program}". '
+                    f'It has been shared with "{program}" — no duplicate needed.',
+                    'success'
+                )
+            else:
+                flash(f'Course {course_code} already exists and is shared with {program}.', 'info')
+            return redirect(url_for('courses.index'))
+
         course = Course(
             course_code=course_code,
             course_title=course_title,
@@ -255,17 +288,33 @@ def batch_create():
                 if status not in ['C', 'R', 'E']:
                     status = 'C'
                 
-                # Check duplicate
-                existing = Course.query.filter_by(
+                # Check if course exists for same program+level
+                existing_same = Course.query.filter_by(
                     course_code=course_code,
                     program=program,
                     level=level
                 ).first()
-                
-                if existing:
-                    errors.append(f'Line {line_num}: Course {course_code} already exists')
+
+                if existing_same:
+                    errors.append(f'Line {line_num}: Course {course_code} already exists for {program}')
                     continue
-                
+
+                # Check if same course exists for another program — share it instead
+                existing_other = Course.query.filter(
+                    Course.course_code == course_code,
+                    Course.level == level,
+                    Course.program != program
+                ).first()
+
+                if existing_other:
+                    already_shared = CourseProgram.query.filter_by(
+                        course_id=existing_other.id, program=program
+                    ).first()
+                    if not already_shared:
+                        db.session.add(CourseProgram(course_id=existing_other.id, program=program))
+                        added += 1
+                    continue
+
                 course = Course(
                     course_code=course_code,
                     course_title=course_title,
