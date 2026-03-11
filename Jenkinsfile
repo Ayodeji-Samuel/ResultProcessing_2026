@@ -56,6 +56,16 @@ pipeline {
             }
         }
 
+        stage('Run Migrations') {
+            steps {
+                sh """
+                    cd ${CURRENT_LINK}
+                    . /var/www/cschub/venv/bin/activate
+                    python migrate_course_code_varchar20.py
+                """
+            }
+        }
+
         stage('Restart Application') {
             steps {
                 sh """
