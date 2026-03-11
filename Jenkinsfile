@@ -11,6 +11,7 @@ pipeline {
         RELEASES_DIR   = "/var/www/cschub/releases"
         CURRENT_LINK   = "/var/www/cschub/current"
         SERVICE_NAME   = "cschub"
+        ENV_FILE       = "/var/www/cschub/env"
     }
 
     stages {
@@ -61,6 +62,7 @@ pipeline {
                 sh """
                     cd ${CURRENT_LINK}
                     . /var/www/cschub/venv/bin/activate
+                    set -a && . ${ENV_FILE} && set +a
                     python migrate_course_code_varchar20.py
                 """
             }
